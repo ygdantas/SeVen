@@ -1,0 +1,35 @@
+omod DATATYPES is
+ protecting NAT .
+
+sorts Key Field FieldSet Nonce Principal Run Role Message EstabComm .
+subsort Nonce Principal Key < Field .
+subsort Field < FieldSet .
+op keypair : Key Key -> Bool [comm] .
+op mtfield : -> Field .
+op ped : Key Field -> Field .
+op n : Principal Nat -> Nonce .
+op cat : Nonce Nonce -> Field .
+op (_,_,_) : Nonce Principal Field -> Run .
+op (_,_,_,_) : Role Nonce Principal Nonce -> EstabComm .
+ops i r : -> Role .
+vars sk pk : Key . 
+var f : Field .
+ceq ped(sk,ped(pk,f)) = f if keypair(sk,pk) .
+
+class Agent | e_com : EstabCom , sec_key : Key , role_i : Run , role_r : Run , d_com : FieldSet , cnt : Nat .
+
+msg from_to_send_ : Principal Principal Field -> Message .
+
+vars A B P : Principal . 
+vars RI RR : Run . 
+vars NI : Nonce .
+var F : Field . 
+var S : FieldSet . 
+vars SKB PKB SKA PKA : Key .
+var C : EstabComm . 
+var J : Nat .
+
+
+rl [BeginRun] : < A : Agent | role_i : RI , d_com : B U S , cnt : J > => < A : Agent | role_i : RI U (n(A,J),B,mtfield) , d_com : S , cnt : J + 1 > from(A)to(B)send(ped(pk(B),n(A,J))) .
+
+endom

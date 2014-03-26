@@ -1,0 +1,232 @@
+fmod PROTOCOL-SYMBOLS is
+
+--- Sorts
+sorts Key KeyE KeyD Estado Msg AnnK Nat .
+subsorts KeyE KeyD < Key .
+subsorts Key Nat < Msg .
+subsort Msg < Estado .
+
+--- Operadores Criptografia
+op enc : Key Msg -> Msg .
+op dec : Key Msg -> Msg .
+
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Concatenacao
+op _,_ : Msg Msg -> Msg [comm assoc] .
+
+--- Equacao Criptografia
+
+var k : Key .
+var m :  Msg .
+eq dec(k, enc(k, m)) = m .
+
+endfm
+
+
+mod NS is
+--- Importacoes
+protecting PROTOCOL-SYMBOLS .
+protecting NAT .
+
+--- Configuracao
+sort Configuracao .
+subsort Estado < Configuracao .
+
+op none : -> Configuracao [ctor] .
+op __ : Configuracao Configuracao -> Configuracao [ctor assoc comm id: none] . 
+
+--- Chave Publica conhecida
+op AnnK : Key -> Estado .
+
+--- Operadores Alice
+op A0 : Key -> Estado .
+op A1 : Key Key Msg -> Estado .
+op A2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Bob
+op B0 : Key -> Estado .
+op B1 : Key Key Msg Msg -> Estado .
+op B2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Intruso
+  --- Ns(x) - Intruso intercepta uma mensagem
+  --- Nr(x) - Intruso envia uma mensagem
+op Ns : Msg -> Estado .
+op Nr : Msg -> Estado . 
+op M  : Msg -> Estado .
+
+--- Operadores Empty Facts
+ops R P : -> Estado .
+
+--- Operadores GoodGuy
+op GoodGuy : Key Key -> Estado .
+ops keA kdA keB kdB : -> Key .
+
+--- Operadores BadKey
+op BadKey : Key Key -> Estado .
+ops keD kdD : -> Key .
+
+--- Operadores Key
+op KP : Key Key -> Estado .
+ 
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Operador Size
+op size : Msg -> Nat .
+
+--- Bound
+op bound : -> Nat .
+eq bound = 5 .
+
+op mem : Estado Configuracao -> Bool .
+eq mem(f:Estado, f:Estado C:Configuracao) = true .
+eq mem(f:Estado, C:Configuracao) = false [owise] .
+
+--- Equacao de inicializacao
+op initial : -> Configuracao .
+eq initial = GoodGuy(keA,kdA) KP(keA,kdA) AnnK(keA) BadKey(keD,kdD) 
+KP(keD,kdD) AnnK(keD) GoodGuy(keB,kdB) KP(keB,kdB) AnnK(keB) M(keA) 
+M(keD) M(kdD) M(keB) counter(0) A0(keA) B0(keD) B0(keB) R R R R R R R R P . 
+
+---eq initial = GoodGuy(keA,kdA) KP(keA,kdA) AnnK(keA) GoodGuy(keB,kdB) KP(keB,kdB) AnnK(keB) counter(0) A0(keA) B0(keB) .
+
+--- Variaveis
+vars k'e ke k' : Key .
+vars x y non tam : Nat .
+vars x1 y1 x_io y_io t1 t2 : Msg .
+vars keDY kdDY : Key .
+var k : Key .
+
+--- Equações Size
+eq size(n:Nat) = 1 .
+eq size(k:Key) = 1 . 
+eq size((t1,t2)) = (size(t1)) + (size(t2)) . 
+eq size(enc(ke,t1)) = (size(t1)) + 2 .
+b
+--- Reescritas
+--- A1 -> REC from Alice -> DEC with keD -> ENC with keB -> SND to Bob -> Bo1 -> REC from Bob -> SND to Alice ->
+--- A2 -> REC from Alice -> DEC with keD -> ENC with keB -> SND to Bob -> Bo2
+
+--- Needham-Schroeder
+crl[Al1]: (counter(x)) AnnK(k'e) A0(ke) P => (counter(x + 1)) A1(ke,k'e,x) Ns(enc(k'e,(ke,x))) AnnK(k'e) if x < 4 .
+rl[Al2]: A1(ke,k'e,x) (Nr(enc(ke,(x,y)))) => (A2(ke,k'e,x,y)) (Ns(enc(k'e,y))) .
+crl[Bo1]: (counter(y)) (B0(ke)) (Nr(enc(ke,(k'e,x)))) (AnnK(k'e)) => (counter(y + 1)) (B1(ke,k'e,x,y)) (Ns(enc(k'e,(x,y)))) (AnnK(k'e)) if y < 4  .
+rl[Bo2]: (B1(ke,k'e,x,y)) (Nr(enc(ke,y))) => (B2(ke,k'e,x,y)) P .
+
+---Regras I/O
+crl[REC]: Ns(enc(k'e,t1)) R => M(enc(k'e,t1)) P if size(t1) < 3 .
+crl[SND]: M(enc(k'e,t1)) P => Nr(enc(k'e,t1)) R if size(t1) < 3 . 
+
+---Composicao Dolev-Yao
+crl[ENC]: KP(keDY,kdDY) M(keDY) M(t1)
+=> 
+   KP(keDY,kdDY) M(keDY) M(enc(keDY,t1))
+if size(t1) < 3 .
+
+
+
+---Decomposicao Dolev-Yao
+--- rl[DCMP]: M((x1,y1)) R => M(x1) M(y1)  .
+
+rl[DEC]: 
+   M(kdDY) KP(keDY,kdDY) M(enc(keDY,x1)) R  
+=> 
+   M(kdDY) KP(keDY,kdDY) M(x1) M(enc(keDY,x1))  .
+
+
+--- crl[create]: AnnK(k) AnnK(k') P P => AnnK(k) A0(k) B0(k') if not (k == k') .
+
+--- rl[DELM]: M(x1) => R .
+
+--- rl[USE]: {conf M(x1) R } =>  { conf M(x1) M(x1) } .
+
+endm
+
+*** search[1, 10] { initial } =>+ { A2(keA, keD, n1:Nat, n2:Nat) B2(keA, keB, n1:Nat, n2:Nat) C:Configuracao } .
+*** search[1, 10] { initial } =>+ { A2(ke:Key, ke':Key, n1:Nat, n2:Nat) M(n1:Nat) C:Configuracao } .
+*** search[1, 10] { initial } =>+ { B2(keB, keA, n1:Nat, n2:Nat) M(n2:Nat) C:Configuracao } .
+*** search[1, 10] { initial } =>+ { A2(ke:Key, ke':Key, n1:Nat, n2:Nat) B2(ke':Key, ke:Key, n1:Nat, n2:Nat) C:Configuracao } .
+*** search[1, 9] { initial } =>+ { A2(ke:Key, ke':Key, n1:Nat, n2:Nat) B2(ke':Key, ke:Key, n1:Nat, n2:Nat) C:Configuracao } .
+*** search { initial } =>+ { A2(keA, keB, 0, 1) B2(keB, keA, 0, 1) C:Configuracao } .
+
+***(
+
+---Composicao Dolev-Yao
+crl[COMP]: { conf M(x1) M(y1) } 
+=> 
+   { conf M((x1,y1)) R } 
+if (size(x1,y1)) < bound 
+/\ not mem(M((x1,y1)), conf) .
+
+*** crl[GEN]: (counter(non)) R => (counter(non + 1))  M(non) if non < 4 .
+
+crl[USE]: {conf M(x1) R } =>  { conf M(x1) M(x1) } 
+if size(x1) < bound 
+/\ not mem(M(x1), conf) .
+
+
+---Regras criar novas sessoes
+-- rl[create]: AnnK(k) AnnK(k') P P => AnnK(k) A0(k) B0(k') .
+
+---Memory maintenance rules
+---rl[DELM]: M(x1) => R .
+---rl[DELA]: A(x1) => R .
+---rl[DELD]: D(x1) => R .
+---rl[DELC]: C(x1) => R .
+
+---rl[snd]: Ns(x1) => Nr(x1) .
+
+search[1, 13] initial  =>+  A1(keA, keD, 0) M(0, keA)  C:Configuracao .
+
+Solution 1 (state 169)
+states: 170  rewrites: 1151 in 0ms cpu (2ms real) (~ rewrites/second)
+C:Configuracao --> R R R R R R P counter(1) AnnK(keA) AnnK(keB) AnnK(keD) B0(keB) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(keD,
+    kdD) KP(keA, kdA) KP(keB, kdB) KP(keD, kdD)
+
+search [1, 13] in NS : initial =>+ C:Configuracao M(enc(keA, (0,1))) A1(keA, keD, 0) B1(keB, keA, 0, 1) .
+
+Solution 1 (state 7653)
+states: 7654  rewrites: 118967 in 188ms cpu (189ms real) (632803 rewrites/second)
+C:Configuracao --> R R R R R R P counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(keD, kdD) KP(
+    keA, kdA) KP(keB, kdB) KP(keD, kdD)
+
+search [1, 13] in NS : initial =>+ C:Configuracao Nr(enc(keA, (0,1))) A1(keA, keD, 0) B1(keB, keA, 0, 1) .
+
+Solution 1 (state 17101)
+states: 17102  rewrites: 295840 in 448ms cpu (447ms real) (660357 rewrites/second)
+C:Configuracao --> R R R R R R R counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(keD, kdD) KP(
+    keA, kdA) KP(keB, kdB) KP(keD, kdD)
+
+search [1, 13] in NS : initial =>+ C:Configuracao A2(keA, keD, 0, 1) B1(keB, keA, 0, 1) .
+
+Solution 1 (state 36627)
+states: 36628  rewrites: 705167 in 1352ms cpu (1351ms real) (521573 rewrites/second)
+C:Configuracao --> R R R R R R R counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) Ns(enc(keD, 1)) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB)
+    BadKey(keD, kdD) KP(keA, kdA) KP(keB, kdB) KP(keD, kdD)
+    
+search [1, 13] in NS : initial =>+ C:Configuracao A2(keA, keD, 0, 1) B1(keB, keA, 0, 1) M(enc(keD, 1)) .
+    
+states: 75838  rewrites: 1608170 in 3264ms cpu (3277ms real) (492699 rewrites/second)
+C:Configuracao --> R R R R R R P counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(keD, kdD) KP(
+    keA, kdA) KP(keB, kdB) KP(keD, kdD)
+    
+search [1, 14] in NS : initial =>+ C:Configuracao A2(keA, keD, 0, 1) B1(keB, keA, 0, 1) M(enc(keB, 1)) .
+Solution 1 (state 294031)
+states: 294032  rewrites: 7378331 in 20584ms cpu (20590ms real) (358449 rewrites/second)
+C:Configuracao --> R R R R R P counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 1)) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(
+    keD, kdD) KP(keA, kdA) KP(keB, kdB) KP(keD, kdD)
+
+search [1, 13] in NS : initial =>+ C:Configuracao A2(keA, keD, 0, 1) B2(keB, keA, 0, 1) .
+No solution.
+states: 604856  rewrites: 16497768 in 121788ms cpu (121815ms real) (135463 rewrites/second)
+
+search [1, 14] in NS : initial =>+ C:Configuracao A2(keA, keD, 0, 1) B2(keB, keA, 0, 1) .
+    
+Solution 1 (state 1091471)
+states: 1091472  rewrites: 31833165 in 624284ms cpu (624959ms real) (50991 rewrites/second)
+C:Configuracao --> R R R R R R P counter(2) AnnK(keA) AnnK(keB) AnnK(keD) B0(keD) M(keA) M(keB) M(keD) M(kdD) M(enc(keD, 1)) M(enc(keD, 0,keA)) GoodGuy(keA, kdA) GoodGuy(keB, kdB) BadKey(
+    keD, kdD) KP(keA, kdA) KP(keB, kdB) KP(keD, kdD)    
+)

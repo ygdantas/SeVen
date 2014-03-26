@@ -1,0 +1,40 @@
+fmod NS is
+--- Importacoes
+protecting PROTOCOL-SYMBOLS .
+
+--- Chave Publica conhecida
+op AnnK : Key -> Estado .
+
+--- Operadores Alice
+op A0 : Key -> Estado .
+op A1 : Key Key Msg -> Estado .
+op A2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Bob
+op B0 : Key -> Estado .
+op B1 : Key Key Msg Msg -> Estado .
+op B2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Intruso
+  --- Ns(x) - Intruso intercepta uma mensagem
+  --- Nr(x) - Intruso envia uma mensagem
+op Ns : Msg -> Estado .
+op Nr : Msg -> Estado . 
+op M  : Msg -> Estado .
+
+--- Operadores GoodGuy
+op GoodGuy : Key Key -> Estado .
+
+--- Equacoes
+
+--- Variaveis
+vars k-e ke : Key .
+vars x y Nat .
+
+--- Reescrita
+rl [Al1] : counter(x) AnnK(k-e) A0(ke) => A1(ke,k-e,counter(x)) Ns(enc(k-e,counter(x+1);ke)) AnnK(k-e) .
+rl [Al2] : A1(ke,k-e,counter(x)) Nr(enc(ke,counter(x);counter(y))) => A2(ke,k-e,counter(x+1),counter(y+1)) Ns(enc(k-e,counter(y+1))) .
+rl [Bo1] : counter(y) B0(ke) Nr(enc(ke,counter(x);k-e)) AnnK(k-e) => B1(ke,k-e,counter(x+1), counter(y+1)) Ns(enc(k-e,counter(x+1);counter(y+1))) AnnK(k-e) .
+rl [Bo2] : B1(ke,k-e,counter(x),counter(y)) Nr(enc(ke,counter(y)) => B2 (ke,k-e,counter(x+1),counter(y+1)) .
+
+endfm

@@ -1,0 +1,47 @@
+@ctmc  Tandem
+@args = double N
+
+@state =
+    public double lambda;  // = 4 * capacity
+    public static double mu1a = 0.2; // 0.1 * 2
+    public static double mu1b = 1.8; // 0.9 * 2
+    public static double mu2 = 2;
+    public static double kappa = 4;
+
+    public int n;
+    public int sc;
+    public int ph;
+    public int sm;
+
+@init =
+        n = (int)N;
+        lambda = 4.0 * n; // = 4 * capacity
+        sc = 0;
+        ph = 0;
+        sm = 0;
+
+@guard = sc < n
+@rate = lambda
+@action = sc = sc + 1;
+
+@guard = (sc > 0) && (ph == 0) && (sm < n)
+@rate = mu1b
+@action =    sc = sc - 1;
+            sm = sm + 1;
+
+@guard = (sc > 0) && (ph == 0)
+@rate = mu1a
+@action =           ph = 1;
+
+@guard = (sc > 0) && (ph == 1) && (sm < n)
+@rate = mu2
+@action =    ph = 0;
+            sc = sc - 1;
+            sm = sm + 1;
+
+@guard   = sm > 0
+@rate = kappa
+@action =           sm = sm - 1;
+
+
+@prop 0 = sc == n && sm == n && ph == 1

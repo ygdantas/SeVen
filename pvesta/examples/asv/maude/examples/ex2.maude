@@ -1,0 +1,19 @@
+fmod PEANO-NAT-EXTRA is 
+
+sort Nat . 
+
+op 0 : -> Nat  . 
+
+op s : Nat -> Nat  . 
+
+op _+_ : Nat Nat -> Nat . 
+
+vars M N : Nat . 
+
+eq 0 + N = N . 
+
+eq s(M) + N = s(M + N) . 
+
+endfm
+
+red 0 + s(s(0)) .

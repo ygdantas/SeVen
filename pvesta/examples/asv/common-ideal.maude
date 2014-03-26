@@ -1,0 +1,311 @@
+mod EX-LIST is
+  pr NAT .
+  sorts List Elt ListWithSize .
+  subsort Elt < List .
+
+  op mtList : -> List .
+  op __ : List List -> List [assoc id: mtList] .
+  op [_,_] : Nat List -> ListWithSize .
+
+  vars L L1 L2 : List .
+  var E E' : Elt . var SZ : Nat .
+  var SC : ListWithSize .
+    
+  op size : ListWithSize -> Nat . 
+  op add : ListWithSize Elt -> ListWithSize .
+  eq size([ SZ , L ]) = SZ .
+  eq add([ SZ , L ] , E) = [ s(SZ) , E L ] . 
+endm
+
+mod ATTRIBUTES is
+  pr EX-LIST .
+  pr APMAUDE .
+
+  --- Client Status
+  sort Status .
+  ops connected waiting failed : -> Status .
+  
+  op req-cnt:_  : Float        -> Attribute .  --- server
+  op req-list:_ : ListWithSize -> Attribute .  --- server
+  op cnt:_      : Nat          -> Attribute .  --- server and generator
+  op server:_   : ActorName    -> Attribute .  --- client, attacker and generator
+  op rep-cnt:_  : Nat          -> Attribute .  --- client
+  op retries:_  : Nat          -> Attribute .  --- client
+  op status:_   : Status       -> Attribute .  --- client
+  op atime:_    : Float        -> Attribute .  --- client
+  op stime:_    : Float        -> Attribute .  --- client
+    
+endm
+
+mod CONFIG is
+  ex ATTRIBUTES .
+  
+  --- server REQ list elements  
+  op req : ActorName -> Elt .
+  
+  --- Additional configuration fields
+  op arate : Float -> Config .    ---- current attack rate
+  op crate : Float -> Config .    ---- current client request rate
+
+  --- Object names
+  op g  :     -> ActorName .   --- generator
+  op c  : Nat -> ActorName .   --- clients
+  op SR :     -> ActorName .   --- server
+  op X  :     -> ActorName .   --- attacker
+
+  --- Message contents
+  ops REQ ACK : ActorName -> Content .
+  ops spawn poll timeout : -> Content .
+  
+endm
+
+mod PARAMS is
+  pr FLOAT .
+  pr NAT .
+  
+  --- Global constants
+  op LIMIT     : -> [Float] .
+  op initDelay : -> [Float] .
+	    
+  --- Global parameters
+  ops newRho minRho maxRho : -> [Float] .
+  ops newAlpha minAlpha maxAlpha : -> [Float] .
+  ops Ts Tc S : -> [Float] . 
+  op  J  : Float Float -> [Nat] .
+  op  delay : -> [Float] .
+  op  dropP : -> [Float] .
+  op  drop? : -> [Nat] .
+  
+endm
+
+mod BEHAVIOR is
+  pr CONFIG .
+  pr PARAMS .
+  pr SAMPLER .
+  
+  --- Auxiliary functions
+  op replicate : Msg Nat Float -> [ScheduleList] .
+  op accept-prob : Float -> Float .
+  op accept-prob : Float Float -> Float .  
+  op replace : List Elt Nat -> List .
+  op acks : ActorName List Float -> [ScheduleList] .
+
+  vars L : List . var E E' : Elt . var SZ : Nat .
+  var SC : ListWithSize .
+  vars gt p d t t' r Rho Alpha : Float . vars i i' j k n : Nat .
+  vars SN AN : ActorName . var b : Bool .
+  var rlist : ListWithSize . var list : List .
+  var m : Msg . var CON : Content . var C : Config .
+  var SL SL' : ScheduleList . var AS : AttributeSet .
+   
+  --- Client receiving an ACK
+  rl [CRec] : 
+     flg(true, r) { gt | SL }
+     <name: c(i) | server: SN , stime: Infinity , status: waiting , AS > 
+     (c(i) <- ACK(SN))
+     => flg(gt <= LIMIT * r, r) 
+        <name: c(i) | server: SN , stime: gt , status: connected , AS > 
+        mytick({ gt | SL }) .
+
+  --- Client ignoring incoming messages when connected or failed
+  rl [CDscrd1] : 
+     flg(true, r) { gt | SL }
+     <name: c(i) | status: connected , AS >  
+     (c(i) <- CON)
+     => flg(gt <= LIMIT * r, r) 
+        <name: c(i) | status: connected , AS >  
+        mytick({ gt | SL }) .
+
+  rl [CDscrd2] : 
+     flg(true, r) { gt | SL }
+     <name: c(i) | status: failed , AS >  
+     (c(i) <- CON)
+     => flg(gt <= LIMIT * r, r)
+        <name: c(i) | status: failed , AS >  
+        mytick({ gt | SL }) .
+
+  --- Attacker sending (fake) REQs
+  rl [ASend] : 
+     flg(true, r) arate(Alpha)
+     <name: AN | server: SN , AS > (AN <- poll) { gt | SL }
+     => flg(gt <= LIMIT * r, r) arate(Alpha)
+        <name: AN | server: SN , AS > 
+        mytick(insert(insert( { gt | SL } ,
+        [ gt + delay , (SN <- REQ(AN)) , drop?] ) ,
+        [ (1.0 / (Alpha * S)) + gt , (AN <- poll), 0 ] ) ) .
+
+
+  --- Attacker ignoring ACKs
+  rl [ADscrd] : 
+     flg(true, r) <name: AN | server: SN , AS > (AN <- ACK(SN)) { gt | SL } 
+     => flg(gt <= LIMIT * r, r) <name: AN | server: SN , AS > mytick({ gt | SL }) .
+
+  --- Definitions of auxiliary functions
+
+  eq replicate(m, s(i), gt) = [ gt + delay , m , drop?] ; replicate(m, i, gt) .          
+  eq replicate(m, 0, gt) = nil .
+  
+  eq accept-prob(p) = floor(S * Ts) / p .
+  eq accept-prob(Rho, Alpha) = 1.0 / (Alpha + Rho * ceiling(Alpha / Rho)) .
+    
+  eq replace(E L, E', s(i)) = E replace(L, E', i) .
+  eq replace(E L, E', 0) = E' L .
+  eq replace(mtList, E', i) = mtList .
+  
+  eq acks(SN, req(AN) L, gt) = [gt + delay , (AN <- ACK(SN)) , drop?] ; acks(SN, L, gt) .
+  eq acks(SN, mtList, gt) = nil .
+
+endm
+
+mod SV-COMMON is
+  inc BEHAVIOR .
+  
+  vars L : List . var E E' : Elt . var SZ : Nat .
+  var SC : ListWithSize .
+  vars gt p d t t' r Rho Alpha : Float . vars i i' j k n : Nat .
+  vars SN AN : ActorName . var b : Bool .
+  var rlist : ListWithSize . var list : List .
+  var m : Msg . var CON : Content . var C : Config .
+  var SL SL' : ScheduleList . var AS : AttributeSet .
+  
+    --- Server handling a REQ
+ crl [ProcessREQ] : 
+     flg(true, r) { gt | SL }
+     <name: SN | req-cnt: p , req-list: [SZ, L] , cnt: i , AS > 
+     (SN <- REQ(AN)) 
+     => flg(gt <= LIMIT * r, r) mytick({ gt | SL })
+        if (float(SZ) >= floor(S * Ts)) then
+          if (sampleBerWithP(accept-prob(p))) then
+            
+            <name: SN | req-cnt: (p + 1.0) , req-list: [SZ, replace(L, req(AN), sampleUniWithInt(SZ))] , cnt: i' , AS > 
+          else
+            
+            <name: SN | req-cnt: (p + 1.0) , req-list: [SZ, L] , cnt: i' , AS >  
+          fi
+        else
+          
+          <name: SN | req-cnt: p , req-list: add([SZ, L], req(AN)) , cnt: i' , AS >  
+        fi 
+            if i' := if AN == X then i else s(i) fi .
+
+  --- Server timing out
+  rl [Timeout] : 
+     flg(true, r) crate(Rho) arate(Alpha) 
+     <name: SN | req-cnt: p , req-list: [SZ, L] , AS > 
+     (SN <- timeout) { gt | SL }
+     => flg(gt <= LIMIT * r, r) crate(newRho) arate(newAlpha) 
+        <name: SN | req-cnt: (floor(S * Ts) + 1.0) , req-list: [0 , mtList] , AS > 
+        mytick(insert(insertList( { gt | SL } , acks(SN, L, gt) ) ,
+                      [ Ts + gt , (SN <- timeout), 0] ) ) .
+
+endm
+
+mod MODEL-PARAMS is
+  pr SAMPLER .
+  inc PARAMS .
+
+  vars Rho Alpha : Float .  
+
+  eq newRho   = 0.06 .
+  ---eq newRho = genRandom(minRho, maxRho) .
+  eq minRho = 0.01 .
+  eq maxRho = 0.20 .
+
+  eq newAlpha = 25.0 .
+  ---eq newAlpha = genRandom(minAlpha, maxAlpha) .
+  eq minAlpha = 1.0 .
+  eq maxAlpha = 50.0 .
+  
+  eq S     = 60.0 .
+  
+  eq Tc = 0.4 .
+  ---eq Tc = 0.2 .
+  ---eq Tc = 0.1 .
+  ---eq Tc = rand * Ts .
+  
+  eq Ts     = 0.4 .
+  
+  ---eq J(Rho,Alpha) = 2 .
+  eq J(Rho,Alpha) = rat(ceiling(log( Alpha / Rho) / log(2.0))) .
+  
+  ---eq delay = rand * 0.2 . 
+  eq delay = 0.0 .
+  
+  eq drop? = 0 .
+  ---eq drop? = if sampleBerWithP(dropP) then 1 else 0 fi .
+  eq dropP = 0.3 .
+
+  eq initDelay = 0.05 .
+  
+  ---eq LIMIT = Tc * float(J) + initDelay + 0.01 .
+  eq LIMIT = 4.0 .  
+  
+endm
+
+mod ANALYSIS is
+  pr CONFIG .
+  pr CONVERSION .
+
+  ---vars L : List . var SZ : Nat .
+  vars gt p t t' r : Float . vars i : Nat .
+  vars SN AN : ActorName . var b : Bool .
+  var C : Config . var AS : AttributeSet .
+
+  --- Analysis functions
+
+  --- Connection ratio
+  ops countConnected countWaiting countFailed : Float Config -> Float .
+  op  countClients : Config -> Float .
+
+  eq countConnected(p, <name: c(i) | status: connected , AS > C ) 
+     = countConnected(p + 1.0 , C) .
+  eq countConnected(p,C) = p [owise] .  
+
+  eq countWaiting(p, <name: c(i) | status: waiting , AS > C ) 
+     = countWaiting(p + 1.0 , C) .
+  eq countWaiting(p,C) = p [owise] .
+
+  eq countFailed(p, <name: c(i) | status: failed , AS > C )
+     = countFailed(p + 1.0 , C) .
+  eq countWaiting(p,C) = p [owise] .
+
+  eq countClients(<name: g | cnt: i , AS > C) = float(i) .
+
+  --- Average time-to-service
+  op  avgTTS : Config -> Float .
+  op  sumTTS : Float Config -> Float .
+ ceq avgTTS(C) = if r > 0.0 then sumTTS(0.0, C) / r else 0.0 fi 
+                    if r := countConnected(0.0, C) .
+
+  eq sumTTS(p, <name: c(i) | atime: t , stime: t' , status: connected , AS > C )
+     = sumTTS(p + (t' + (- t)), C) .
+  eq sumTTS(p, C) = p [owise] .  
+
+
+  --- Bandwidth usage
+  op  bw : Config -> Float .
+
+  eq bw(<name: SR | cnt: i , AS > C) = float(i) .
+
+  --- Success Probability
+  op hasConnected : Nat Config -> Float .
+
+  eq hasConnected(i, <name: c(i) | status: connected , AS > C ) = 1.0 .
+  eq hasConnected(i, C) = 0.0 [owise] .
+ 
+
+  *** to be used by Quatex
+  eq tick( flg(b, r) C ) = flg(true, r + 1.0) C .
+
+  eq sat(0, C) = if hasConnected(0, C) > 0.0 then true else false fi .
+
+  eq val(0,C) = countConnected(0.0,C) .
+  eq val(1,C) = countWaiting(0.0,C) .
+  eq val(2,C) = countFailed(0.0,C) .
+  eq val(3,C) = countClients(C) .
+  eq val(4,C) = countConnected(0.0, C) / countClients(C) . 
+  eq val(5,C) = avgTTS(C) . 
+  eq val(6,C) = bw(C) . 
+  eq val(7,C) = hasConnected(0, C) . 
+    
+endm

@@ -1,0 +1,84 @@
+(omod NSPK is
+
+protecting NAT .
+
+sort Nonce .
+
+op nonce : Oid Nat -> Nonce [ctor] .
+sort Key .
+op pubKey : Oid -> Key [ctor] .
+
+sort MsgContent .
+op _;_ : Nonce Oid -> MsgContent [ctor] . *** Message kind "1"
+op _;_ : Nonce Nonce -> MsgContent [ctor] . *** Message kind "2"
+subsort Nonce < MsgContent . *** Message kind "3"
+
+sort EncrMsgContent .
+op encrypt_with_ : MsgContent Key -> EncrMsgContent [ctor] .
+
+msg msg_from_to_ : EncrMsgContent Oid Oid -> Msg .
+
+class Initiator | initSessions : InitSessions, nonceCtr : Nat .
+sorts Sessions InitSessions .
+
+subsort Sessions < InitSessions .
+
+op emptySession : -> Sessions [ctor] .
+
+op __ : InitSessions InitSessions -> InitSessions [ctor assoc comm id: emptySession] .
+
+op __ : Sessions Sessions -> Sessions [ctor assoc comm id: emptySession] .
+
+op notInitiated : Oid -> InitSessions [ctor] .
+
+op initiated : Oid Nonce -> InitSessions [ctor] .
+
+op trustedConnection : Oid -> Sessions [ctor] .
+
+vars A B : Oid .
+
+vars M N : Nat .
+
+vars NONCE NONCE’ : Nonce .
+
+var IS : InitSessions .
+
+rl[start-send-1]: 
+< A : Initiator | initSessions : notInitiated(B) IS, nonceCtr : N >
+=>
+< A : Initiator | initSessions : initiated(B, nonce(A, N)) IS,nonceCtr : N + 1 > msg (encrypt (nonce(A, N) ; A) with pubKey(B)) from A to B .
+
+rl[read-2-send-3]: (msg (encrypt (NONCE ; NONCE’) with pubKey(A)) from B to A) < A : Initiator | initSessions : initiated(B, NONCE) IS >
+=>
+< A : Initiator | initSessions : trustedConnection(B) IS > msg (encrypt NONCE’ with pubKey(B)) from A to B .
+
+class Responder | respSessions : RespSessions, nonceCtr : Nat .
+
+sort RespSessions .
+
+subsort Sessions < RespSessions .
+
+op __ : RespSessions RespSessions -> RespSessions [ctor assoc comm id: emptySession] .
+
+op responded : Oid Nonce -> RespSessions [ctor] .
+
+var RS : RespSessions .
+
+crl[read-1-send-2]: (msg (encrypt (NONCE ; A) with pubKey(B)) from A to B)
+< B : Responder | respSessions : RS, nonceCtr : N >
+=>
+< B : Responder | respSessions : responded(A, nonce(B, N)) RS, nonceCtr : N + 1 > msg (encrypt (NONCE ; nonce(B, N)) with pubKey(A)) from B to A
+if not A inSession RS .
+
+op _inSession_ : Oid RespSessions -> Bool .
+
+eq A inSession emptySession = false .
+eq A inSession (trustedConnection(B) RS) = (A == B) or (A inSession RS) .
+eq A inSession (responded(B, NONCE) RS) = (A == B) or (A inSession RS) .
+
+rl[read-3]: (msg (encrypt NONCE with pubKey(B)) from A to B) < B : Responder | respSessions : responded(A, NONCE) RS >
+=> < B : Responder | respSessions : trustedConnection(A) RS > .
+
+class InitiatorAndResponder .
+subclass InitiatorAndResponder < Initiator Responder .
+endom)

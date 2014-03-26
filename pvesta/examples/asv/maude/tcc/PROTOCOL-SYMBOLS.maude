@@ -1,0 +1,21 @@
+fmod PROTOCOL-SYMBOLS is
+
+--- Sorts
+sorts Key Estado Msg AnnK Nat .
+subsort Key Nat < Msg .
+subsort Msg < Estado .
+
+--- Operadores Criptografia
+op enc : Key Msg -> Msg .
+op dec : Key Msg -> Msg .
+
+--- Nonce
+op counter : Nat -> Msg .
+
+--- Concatenacao
+op _,__ : Msg Msg -> Msg .
+
+--- Equacao Criptografia
+eq dec(Key, enc(Key, Msg)) = Msg .
+
+endfm 

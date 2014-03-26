@@ -1,0 +1,17 @@
+mod CIGARETTES is 
+
+sort State . 
+
+op c : -> State [ctor] .    *** cigarette 
+
+op b : -> State [ctor] .    *** butt 
+
+op __ : State State -> State [ctor assoc comm] . 
+
+rl [smoke] : c => b . 
+
+rl [makenew]  : b b b b => c . 
+
+endm
+
+rew [100] c c c c c c c c c c c c c c c c

@@ -1,0 +1,113 @@
+fmod PROTOCOL-SYMBOLS is
+
+--- Sorts
+sorts Key Estado Msg AnnK Nat .
+subsorts Key Nat < Msg .
+subsort Msg < Estado .
+
+--- Operadores Criptografia
+op enc : Key Msg -> Msg .
+op dec : Key Msg -> Msg .
+
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Concatenacao
+op _,_ : Msg Msg -> Msg .
+
+--- Equacao Criptografia
+
+var k : Key .
+var m :  Msg .
+eq dec(k, enc(k, m)) = m .
+
+endfm
+
+
+mod NS is
+--- Importacoes
+protecting PROTOCOL-SYMBOLS .
+protecting NAT .
+
+--- Configuracao
+sort Configuracao .
+subsort Estado < Configuracao .
+op none : -> Configuracao [ctor] .
+op __ : Configuracao Configuracao -> Configuracao [ctor assoc comm id: none] . 
+
+--- Chave Publica conhecida
+op AnnK : Key -> Estado .
+
+--- Operadores Alice
+op A0 : Key -> Estado .
+op A1 : Key Key Msg -> Estado .
+op A2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Bob
+op B0 : Key -> Estado .
+op B1 : Key Key Msg Msg -> Estado .
+op B2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Intruso
+  --- Ns(x) - Intruso intercepta uma mensagem
+  --- Nr(x) - Intruso envia uma mensagem
+op Ns : Msg -> Estado .
+op Nr : Msg -> Estado . 
+op M  : Msg -> Estado .
+op D  : Msg -> Estado .
+op C  : Msg -> Estado .
+op A  : Msg -> Estado .
+
+--- Operadores GoodGuy
+op GoodGuy : Key Key -> Estado .
+ops keA kdA keB kdB : -> Key .
+
+--- Operadores BadKey
+op BadKey : Key Key -> Estado .
+ops keD kdD : -> Key .
+
+--- Operadores Key
+op KP : Key Key -> Estado .
+ 
+
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Equacao de inicializacao
+op initial : -> Configuracao .
+eq initial = GoodGuy(keA,kdA) KP(keA,kdA) AnnK(keA) BadKey(keD,kdD) 
+KP(keD,kdD) AnnK(keD) GoodGuy(keB,kdB) KP(keB,kdB) AnnK(keB) M(keA) 
+M(keD) M(kdD) M(keB) counter(0) A0(keA) B0(keB) .
+
+--- Variaveis
+vars k-e ke : Key .
+vars x y non : Nat .
+vars x1 y1 : Msg .
+vars keDY kdDY : Key .
+
+--- Reescritas
+---rl[aa]: counter(x) => counter(x + 1) .
+--- Needham-Schroeder
+rl[Al1]: (counter(x)) (AnnK(k-e)) (A0(ke)) => (counter(x + 1)) (A1(ke,k-e,x)) (Ns(enc(k-e,(x,ke)))) (AnnK(k-e)) .
+rl[Al2]: (counter(x)) (counter(y)) (A1(ke,k-e,x)) (Nr(enc(ke,(x,y)))) => (counter(x + 1)) (counter(y + 1)) (A2(ke,k-e,x,y)) (Ns(enc( k-e,(y) ))) .
+rl[Bo1]: (counter(x)) (counter(y)) (B0(ke)) (Nr(enc(ke,(x,k-e)))) (AnnK(k-e)) => (counter(x + 1)) (counter(y + 1)) (B1(ke,k-e,x,y)) (Ns(enc(k-e,(x,y)))) (AnnK(k-e)) .
+rl[Bo2]: (counter(x)) (counter(y)) (B1(ke,k-e,x,y)) (Nr(enc(ke,y))) => (counter(x + 1)) (counter(y + 1)) (B2(ke,k-e,x,y)) .
+
+---Decomposicao Dolev-Yao
+rl[DCMP]: D((x,y)) => D(x) D(y) .
+rl[LRN]:   D(x) => M(x) . 
+rl[DEC]:   M(kdDY) KP(keDY,kdDY) D(enc(keDY,x)) => M(kdDY) KP(keDY,kdDY) D(x) M(enc(keDY,x)) .
+rl[LRNA]:  D(enc(keDY,x)) => M(enc(keDY,x)) A(enc(keDY,x)) .
+rl[DECA]:  M(kdDY) KP(keDY, kdDY) A(enc(keDY,x)) => M(kdDY) KP(keDY,keDY) D(x) .
+
+---Composicao Dolev-Yao
+rl[COMP]:  C(x) C(y) => C((x,y)) .
+rl[USE]:   M(x) => C(x) M(x) .
+rl[ENC]:  KP(kdDY, keDY) M(keDY) C(x) => KP(kdDY, keDY) M(keDY) C(enc(keDY,x)) .
+rl[GEN]: (counter(non)) =>  M(non) .
+
+---Regras I/O
+rl[REC]: Ns(x) => D(x) .
+rl[SND]: C(x) => Nr(x) . 
+
+endm

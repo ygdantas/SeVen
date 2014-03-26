@@ -1,0 +1,58 @@
+in common-ideal.maude
+
+mod ASV-RULES is
+  inc SV-COMMON .
+  
+  vars gt r Rho Alpha : Float . vars i j k : Nat . vars SN : ActorName . 
+  var SL : ScheduleList . var AS : AttributeSet .
+   
+  --- Clients coming in at the rate of Rho * S
+  eq crate(Rho)
+     <name: g | cnt: i , server: SN , AS > (g <- spawn) { gt | SL }
+     = crate(Rho)
+        <name: g | cnt: s(i) , server: SN , AS > 
+        <name: c(i) | server: SN , retries: 0 , rep-cnt: 1 , 
+                         atime: gt , stime: Infinity , status: waiting > 
+        mytick(insert(insert( { gt | SL } ,
+           [ gt , (c(i) <- poll), 0 ] ) ,
+	   [ (1.0  / (Rho * S)) + gt , (g <- spawn), 0 ] ) ) .
+
+  --- Client sending a REQ
+  rl [CSend] : 
+     flg(true, r) crate(Rho) arate(Alpha)
+     <name: c(i) | server: SN , retries: j , rep-cnt: k , status: waiting , AS > 
+     (c(i) <- poll) { gt | SL }
+     => flg(gt <= LIMIT * r, r) crate(Rho) arate(Alpha)
+        if (j <= J(Rho,Alpha)) then
+          <name: c(i) | server: SN , retries: s(j) , rep-cnt: (2 * k), status: waiting , AS > 
+          mytick(insert(insertList( { gt | SL } , 
+                   replicate( (SN <- REQ(c(i))) , k , gt) ) , 
+                   [ Tc + gt , (c(i) <- poll), 0 ] ) )   
+        else
+          <name: c(i) | server: SN , retries: j , rep-cnt: k , status: failed , AS > 
+          mytick({ gt | SL })
+        fi .
+  
+endm
+
+mod ASV is
+  inc ASV-RULES .
+  inc MODEL-PARAMS .
+  
+  --- Initial State  
+  eq initState = flg(false, 0.0) crate(newRho) arate(newAlpha) 
+                 <name: SR | req-cnt: (floor(S * Ts) + 1.0) , req-list: [0 , mtList] , cnt: 0 > 
+                 <name: g | cnt: 0 , server: SR > 
+		 if newAlpha > 0.0 then
+                    <name: X | server: SR > (X <- poll) 
+                    { 0.0 | insert([ Ts , (SR <- timeout), 0] , [initDelay , (g <- spawn), 0]) } 
+                 else
+		    mytick({ 0.0 | insert([ Ts , (SR <- timeout), 0] , [initDelay , (g <- spawn), 0]) }) 
+		 fi .
+		 	 
+endm
+
+mod ASV-ANALYSIS is
+  inc ASV .
+  inc ANALYSIS .  
+endm

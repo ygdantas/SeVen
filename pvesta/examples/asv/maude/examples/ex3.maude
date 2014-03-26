@@ -1,0 +1,27 @@
+fmod NAT-LIST-ASSOC is
+
+protecting NAT .
+
+sorts NeList List .
+
+subsorts Nat < NeList < List .
+
+op nil : -> List .
+
+op _ _ : List List -> List [assoc] .
+
+op _ _ : NeList NeList -> NeList [assoc] .
+
+op tail : NeList -> List .
+
+op head : NeList -> Nat .
+
+var N : Nat . var L : List .
+
+eq nil L = L . eq L nil = L .
+
+eq tail(N L) = L . eq head(N L) = N .
+
+endfm
+
+red tail( 1 2 3 4 ) .

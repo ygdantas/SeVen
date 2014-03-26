@@ -1,0 +1,52 @@
+fmod PROTOCOL-OPERATIONS is
+
+--- Sorts
+
+sorts Name Nonce Key .
+
+subsort Name Nonce Key < Msg .
+
+subsort Name < Key .
+
+
+--- Operadores de Criptografia de chave publica(pk) e chave privada (sk) 
+
+op pk : Key Msg -> Msg .
+
+op sk : Key Msg -> Msg .
+
+--- Operador do Nonce (Fresh - Garante ser unico). O nonce é gerador a partir do agente, por isso o argumento Name
+
+op n : Name Fresh -> Nonce .
+
+--- Agentes
+
+op a : -> Name . --- Alice
+
+op b : -> Name . --- Bob
+
+op i : -> Name . --- Intruso
+
+--- Operador de concatenacao - gather (e E) indica que o simbolo tem que estar associado a esquerda
+
+op _;_ : Msg Msg -> Msg [gather (e E) ] .
+
+endfm
+
+
+fmod PROTOCOL-CRIPTO is
+
+protecting PROTOCOL-OPERATIONS .
+
+var M : Msg .
+
+var Chave : Key .
+
+--- Decriptografar
+
+eq pk(Chave,sk(Chave,M)) = M .
+
+eq sk(Chave,pk(Chave,M)) = M .
+
+endfm
+

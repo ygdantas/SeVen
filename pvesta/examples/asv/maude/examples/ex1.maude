@@ -1,0 +1,10 @@
+fmod HELLOWORLD is
+protecting STRING .
+  sort Nat .
+  op helloworld : -> String .
+  op hw : -> Nat .
+  eq helloworld = "Hello, world!" . 
+  eq hw = 1 .
+endfm
+red hw .
+red helloworld .

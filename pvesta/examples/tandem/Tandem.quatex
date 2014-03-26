@@ -1,0 +1,2 @@
+TandemQ() = if { s.getTime() > 100.0 } then {0.0} else if { s.sat(0) } then {1.0} else #TandemQ( ) fi fi ;
+eval E[ TandemQ() ];

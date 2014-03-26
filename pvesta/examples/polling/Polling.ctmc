@@ -1,0 +1,43 @@
+@ctmc Polling
+@args = double N
+@state =    public int n;
+
+    public double mu = 1;
+    public double gamma = 200;
+    public double lambda;
+
+    public int s;
+    public int a;
+    public int[] si;
+
+@init =
+        this.n = (int)N;
+        si = new int[n];
+        lambda = 1.0 / n;
+        for (int j = 0; j < n; j++) si[j] = 1;
+        s = 1;
+        a = 1;
+
+@guard = a == 0 && si[s - 1] == 0
+@rate = gamma
+@action =            s = s + 1;
+            if (s > n) s = 1;
+
+@guard = a == 0 && si[s - 1] == 1
+@rate = gamma
+@action =            a = 1;
+
+@guard = a == 1 && si[s - 1] == 1
+@rate = mu
+@action = si[s - 1] = 0;
+            s = s + 1;
+            if (s > n) s = 1;
+            a = 0;
+
+@code = for(int j=0;j<n;j++){
+@guard  = true
+@rate = lambda
+@action = si[s - 1] = 1;
+@code = }
+
+@prop 0 = s == 1 && a == 0

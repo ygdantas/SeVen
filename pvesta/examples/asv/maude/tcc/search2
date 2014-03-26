@@ -1,0 +1,1 @@
+search in NS: GoodGuy(ke1,kd1) & KP(ke1,kd1) & AnnK(ke1) & BadKey(ke2,kd2) & KP(ke2,kd2) & AnnK(ke2) & GoodGuy(ke3,kd3) & KP(ke3,kd3) & AnnK(ke3) & M(ke1) & M(ke2) & M(kd2) & M(ke3) & counter(0) =>+ M(x : Nat) .

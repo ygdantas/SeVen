@@ -1,0 +1,19 @@
+fmod TCP is
+
+sort Flag .
+op syn : -> Flag [ctor] .
+op ack : -> Flag [ctor] .
+op syn_ack : -> Flag .
+op _ : Flag -> Flag [ctor]
+
+endfm
+
+mod THREEWAYHANDSHAKE is
+protecting TCP .
+
+rl [step01] : syn -> syn_ack .
+rl [step02] : syn_ack -> ack .
+
+endm
+
+rew [1] syn

@@ -1,0 +1,115 @@
+fmod PROTOCOL-SYMBOLS is
+
+--- Sorts
+sorts Key KeyE KeyD Estado Msg AnnN Nat .
+subsorts KeyE KeyD < Key .
+subsorts Key Nat < Msg .
+subsort Msg < Estado .
+
+--- Operadores Criptografia
+op enc : Key Msg -> Msg .
+op dec : Key Msg -> Msg .
+
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Concatenacao
+op _,_ : Msg Msg -> Msg .
+
+--- Equacao Criptografia
+
+var k : Key .
+var m :  Msg .
+eq dec(k, enc(k, m)) = m .
+
+endfm
+
+
+mod YAHALOM is
+--- Importacoes
+protecting PROTOCOL-SYMBOLS .
+protecting NAT .
+
+--- Configuracao
+sort Configuracao .
+subsort Estado < Configuracao .
+
+op none : -> Configuracao [ctor] .
+op __ : Configuracao Configuracao -> Configuracao [ctor assoc comm id: none] . 
+
+--- Chave Publica conhecida
+op AnnN : Key -> Estado .
+
+--- Operadores Alice
+op A0 : Key -> Estado .
+op A1 : Key Key Msg -> Estado .
+op A2 : Key Key Msg Msg -> Estado .
+
+--- Operadores Bob
+op B0 : Key -> Estado .
+op B1 : Key Key Msg Msg -> Estado .
+op B2 : Key Key Msg Msg Key -> Estado .
+
+--- Operadores Server
+op S0 : -> Estado .
+op S1 : Key Key -> Estado .
+
+--- Operadores Guy
+op Guy : Key Key -> Estado .
+ops A kAS : -> Key .
+ops B kBS : -> Key .
+
+--- Operadores Intruso
+  --- Ns(x) - Intruso intercepta uma mensagem
+  --- Nr(x) - Intruso envia uma mensagem
+op Ns : Msg -> Estado .
+op Nr : Msg -> Estado . 
+op M  : Msg -> Estado .
+op D  : Msg -> Estado .
+op C  : Msg -> Estado .
+op A  : Msg -> Estado .
+
+--- Operadores Empty Facts
+ops R P : -> Estado .
+
+--- Operadores Key
+op KP : Key Key -> Estado .
+ 
+--- Nonce
+op counter : Nat -> Estado .
+
+--- Operador Size
+op size : Msg -> Nat .
+
+--- Equacao de inicializacao
+op initial : -> Configuracao .
+eq initial = Guy(A,kAS) Guy(B,kBS) AnnN(A) AnnN(B) .
+---eq initial = GoodGuy(keA,kdA) KP(keA,kdA) AnnN(keA) GoodGuy(keB,kdB) KP(keB,kdB) AnnN(keB) counter(0) A0(keA) B0(keB) .
+
+--- Variaveis
+vars kGS kG'S kGS' G G' kG'G kGG' : Key .
+vars x y : Nat .
+vars x1 y1 x_io y_io t1 t2 z : Msg .
+vars keDY kdDY : Key .
+
+--- Equações Size
+--- eq size(n:Nat) = 0 .
+--- eq size(k:Key) = 0 . 
+---eq size(t1,t2) = (size(t1)) + (size(t2)) . 
+---eq size(enc(ke,x)) = (size(x)) + 2 .
+
+
+--- Reescritas
+
+--- YAHALOM
+
+rl[A1]: counter(x) G A0(kGS) AnnN(G') => counter(x + 1) A1(kGS,G',x) Ns((G,x)) AnnN(G') .
+rl[A2]: A1(kGS,G',x) Nr( (enc(kGS,(G',(kGG',(x, y)))) , z) ) => A2(kGS,G',x,y) Ns( (z,enc(kGG',y)) ) .
+rl[B1]: counter(y) G B0(kGS) Nr(G', x) AnnN (G') => counter(y + 1) B1(kGS,G',x,y) Ns((G,enc(kGS,(G',(x, y))))) AnnN(G') .
+rl[B2]: B1(kGS,G',x,y) Nr( ( enc(kGS ,(G', kG'G)), enc(kG'G,y)) ) => B2(kGS,G', x, y, kG'G) .
+rl[S1]: S0 Guy(G,kGS) Guy(G', kGS') Nr( (G , enc( kGS,(G',(x,y))) ) ) => S1 (G',G) Guy(G, kGS) Guy(G', kGS') NS( ( enc(kG'S, (G, (kG'G , (x, y)))) , enc(kGS , (G', kG'G)) ) ) .
+
+rl[snd]: Ns(x1) => Nr(x1) .
+
+
+endm
