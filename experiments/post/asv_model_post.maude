@@ -464,7 +464,7 @@ eq checkEmpty (C:Config) = false [owise] .
 	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS >
 	(Actor <- REMOVE) { gt | SL }
     =>
-	<name: Ser | req-cnt: p , conn-set: [SZC | Buf ] , req-set: [SZ + (-1) | remove(ListReq, Actor) ], cnt: i , suc-get: k , AS >
+	<name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ + (-1) | remove(ListReq, Actor) ], cnt: i , suc-get: k , AS >
 	mytick({ gt | SL }) .
 
 --- TODO PRAGMA e ENVIO DE PACOTES PRAGMA PELO ATACANTE
@@ -599,8 +599,6 @@ rl [ATSendPOST] :
       mytick({ gt | SL }) . 	
 
 
-
-
 --- *** PVeSTa *** ---
 
 var P : Float .
@@ -650,11 +648,11 @@ eq sat(0, C) = if hasConnected(0, C) > 0.0 then true else false fi .
 eq val(0,C) = countConnected(0.0,C) .
 eq val(1,C) = countClients(C) .
 eq val(2,C) = countConnected(0.0, C) / countClients(C) . 
-eq val(3,C) = countConAttacker(0.0,C) .
-eq val(4,C) = countAttackers(C) .
-eq val(5,C) = networkTraffic(C) .
-eq val(6,C) = countPragma(C) .
-eq val(7,C) = avgTTS(C) .
+---eq val(3,C) = countConAttacker(0.0,C) .
+eq val(3,C) = countAttackers(C) .
+eq val(4,C) = networkTraffic(C) .
+---eq val(6,C) = countPragma(C) .
+eq val(5,C) = avgTTS(C) .
 
 endm	
 
