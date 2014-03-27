@@ -8,11 +8,8 @@ experiments/		attacks/defenses implemented in Maude
    get-pragma/		attack/defense get-pragma implemented in Maude
    post/		attack/defense post implemented in Maude
 maude/ 			maude tool x86
-<<<<<<< HEAD
 maude64/		maude tool 64
-=======
 maude64/		maude tool 64		
->>>>>>> 10f200f9463a7b0ea59a217a242b44e05faf596e
 pvesta/			pvesta tool
 
 
@@ -48,15 +45,6 @@ Where x can be classified as follows:
 
 This code is based on the strategy developed by Jonas Eckhardt and Tobias Mühlbauer.
 
-<<<<<<< HEAD
 ====
-
-
-
-
-=======
->>>>>>> 10f200f9463a7b0ea59a217a242b44e05faf596e
-====
-
 
 
