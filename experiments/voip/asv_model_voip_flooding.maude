@@ -1,0 +1,754 @@
+mod SAMPLER is
+  pr RANDOM .
+  pr COUNTER .
+  pr CONVERSION .
+
+  op sampleBerWithP : Float -> Bool .
+  op sampleUniWithInt : Nat -> Nat .       
+  op genRandom : Float Float -> [Float] .
+  var n s : Nat .
+
+  op rand : -> [Float] .
+  rl [rnd] : rand => float(random(counter) / 4294967296) .
+
+  op rrand : -> [Rat] .
+  rl [rrnd] : rrand => random(counter) / 4294967296 .
+	
+  var R R1 Min Max : Float .
+
+  eq sampleBerWithP(R) = if rand < R then true else false fi . 
+  eq sampleUniWithInt(n) = floor(rrand * n) .
+  eq genRandom(Min, Max) = - log(1.0 - (rand * (Max - Min) + Min) ) .
+
+endm
+
+mod AUXILIAR is
+
+protecting NAT . 
+protecting FLOAT .
+protecting CONVERSION .
+
+sort Contents .
+sort Address .
+
+sort Msg .
+op _<-_ : Address Contents -> Msg . --- construtor Msg
+
+sort ActiveMsg .
+subsort ActiveMsg < Config .
+op {_,_} : Float Msg -> ActiveMsg . --- Mensagem ativa
+
+sort Actor .
+sort ActorType . --- (atacante, servidor, client)
+sorts Attribute AttributeSet .
+subsort Attribute < AttributeSet .
+op none : -> AttributeSet .
+op _,_ : AttributeSet AttributeSet -> AttributeSet [assoc comm id: none] . --- Concatenar AttributeSET
+op <name:_|_> : Address AttributeSet -> Actor . --- construtor actor
+ 
+  op [__] : Msg Msg -> Msg .
+  sort Config .
+  subsorts Msg ActorType Actor < Config .
+
+  sort Object .
+  subsort Actor < Object . --- Actor can be represented by a term of sort Object
+  subsort Msg < Object . --- Message can be represented by a term of sort Object
+  subsort Object < Config .
+
+--- Config
+  op none : -> Config .
+  op flag : Bool Float -> Config . ---- a flag delimiting execution rounds
+  op __ : Config Config -> Config [assoc comm id: none] . --- construtor Config
+--- END OF Config
+
+--- SCHEDULER
+  sorts Scheduler ScheduleMsg ScheduleList .
+  subsorts ScheduleMsg Scheduler < ScheduleList .
+  subsort Scheduler ScheduleMsg ScheduleList < Config .
+  subsort Msg ActiveMsg < Scheduler .
+  subsort Msg ActiveMsg < ScheduleList .
+
+  op {_|_} : Float ScheduleList -> Scheduler .
+  op  nil : -> ScheduleList .
+  op  _;_ : ScheduleList ScheduleList -> ScheduleList [assoc id: nil] .
+  op [_,_,_] : Float Msg Nat -> ScheduleMsg . --- Agendar envio de mensagem
+--- END OF SCHEDULER
+
+
+--- Scheduler Operation
+  op insert : Scheduler ScheduleMsg -> Scheduler .
+  op insert : ScheduleList ScheduleMsg -> ScheduleList .
+  op insertList : Scheduler ScheduleList -> Scheduler .
+  op insertList : ScheduleList ScheduleList -> ScheduleList .
+--- End of List Operation
+
+  op tick : Config -> Config .
+  op mytick : Scheduler -> Config .
+  op global-time : Scheduler -> Float .
+  op getTime : Config -> Float .
+	
+  var t1 t2 t gt : Float .
+  var C : Config .
+  var O O1 : Object .
+  var p i : Nat .
+  var SL SL' : ScheduleList .
+  var e : ScheduleMsg .
+  var M1 M2 : Msg .
+
+--- { float | Msg } --> ActiveMsg . 
+  eq global-time({ gt | SL }) = gt .
+  eq getTime(C {gt | SL}) = gt .  
+
+  eq insert({ gt | SL },e) = { gt | insert(SL,e) } .
+  eq insert(SL , [ t2 , M2, 1 ]) = SL .   
+  eq insert([ t1 , M1, p ] ; SL , [ t2 , M2, 0 ]) = 
+       if t1 < t2 then [ t1 , M1, p ] ; insert(SL, [ t2 , M2, 0 ]) 
+                  else ([ t2 , M2, 0 ] ; [ t1 , M1, p ] ; SL) fi .
+  eq insert( nil , [ t2 , M2, 0 ]) = [ t2 , M2, 0 ] .
+
+
+  eq insertList({ gt | SL }, SL') = { gt | insertList(SL, SL') } .
+  eq insertList(SL , [t2 , M2, p] ; SL') = insertList( insert(SL, [t2, M2, p]), SL' ) .
+  ---eq insertList( nil , SL') = SL' .
+  eq insertList( SL , nil ) = SL .
+
+  eq mytick({ gt | [ t1 , M1, p ] ; SL }) = M1 { t1 | SL } .
+
+
+endm
+
+mod teste is 
+
+protecting NAT . 
+protecting FLOAT .
+protecting AUXILIAR .
+protecting RANDOM .
+pr COUNTER .
+protecting CONVERSION .
+protecting SAMPLER .
+
+
+vars eleBuf neleBuf : EleBuf .
+vars ads nads : Address .
+vars f nf li nli : Float .
+vars limI limS nlimI nlimS ran : Nat .
+
+--- PACKAGES - mensagem
+  op GET : Address Nat -> Contents .
+  op PRAGMA : Address Nat -> Contents . --- endereço, tamanho do pacote pragma
+  op ACK : -> Contents .
+  op END : -> Contents .
+  op TIMEOUT : Address -> Contents .
+  op TIMEOUT : -> Contents .
+  op CONNECT : -> Contents .
+  op FAIL : -> Contents .
+  op INVITE : Address -> Contents .
+  op RINGING : -> Contents .
+  op TRYING : -> Contents .
+  op BYE : Address -> Contents .
+  op REMOVE : -> Contents .
+  op UPDATE : Address -> Contents .
+
+  ops spawn poll restart itimeout : -> Contents .
+
+--- END OF PACKAGES
+
+--- SERVER
+  op server:_ : Address -> Attribute .	
+  op req-cnt:_ : Float -> Attribute .
+  op req-set:_ : NBuffer -> Attribute .
+  op conn-set:_ : NBuffer -> Attribute . 
+  op cnt:_ : Nat -> Attribute .
+  op suc-get:_ : Nat -> Attribute .
+--- END OF SERVER 
+
+--- CLIENT
+  sort Status .
+  ops waiting connected failed : -> Status .
+  op status:_ : Status -> Attribute [gather(&)] .
+  op call:_ : Status -> Attribute [gather(&)] .
+  op retries:_ : Nat -> Attribute .
+  op rep-cnt:_ : Nat -> Attribute .
+  op atime:_ : Float -> Attribute .  
+  op stime:_ : Float -> Attribute .  
+
+--- END OF CLIENT 
+
+--- ATTACKER
+  ops none get pragma : -> Status .
+  ops none invite oncall complete incomplete : -> Status . 
+  op step:_ : Status -> Attribute [gather(&)] .
+  op cnt-pragma:_ : Nat -> Attribute .
+--- END OF ATTACKER
+
+--- Object names
+  op g  :     -> Address .   --- generator
+  op ga : -> Address . --- generator attackers
+  op c  : Nat -> Address .   --- clients
+  op a : Nat -> Address . --- attackers
+  op At : -> Address . --- attacker
+  op server : -> Address . --- Server
+  op attacker : -> Address .
+
+--- Buffer
+
+  sorts EleBuf Buffer NBuffer .
+  subsorts Address Float Buffer < NBuffer .
+  subsort NBuffer < Attribute .
+  subsort EleBuf < Buffer .
+  
+--- Elementos do Buffer 
+ --- op <____> : Address Float Float Nat -> EleBuf . --- elementos do buffer (id, time da entrada, time da ultima requisição, tamanho get pack)
+  op <_____> : Address Float Float Nat Nat -> EleBuf .
+  op [_|_] : Nat Buffer -> NBuffer . --- NBuffer
+  op none : -> Buffer .
+  op __ : Buffer Buffer -> Buffer [comm assoc id: none] .   --- Construtor Buffer
+  op getAddress : EleBuf -> Address .
+  eq getAddress( < ads f li limI limS > ) = ads . 
+  op getBuffer : NBuffer -> Buffer .
+  eq getBuffer( [SZ:Nat | B:Buffer] ) = B:Buffer .
+  op getLimI : Address Buffer -> Nat .
+  eq getLimI( ads , < ads f li limI limS > B:Buffer ) = limI .  
+  op getTime : Address Buffer -> Float .
+  eq getTime( ads , < ads f li limI limS >  B:Buffer ) = f .
+  op getLastTime : Address Buffer -> Float .
+  eq getLastTime( ads , < ads f li limI limS > B:Buffer ) = li . 
+  op getLimS : Address Buffer -> Nat .
+  eq getLimS( ads , < ads f li limI limS > B:Buffer ) = limS .  
+
+--- Operadores do Buffer 
+  op add : NBuffer EleBuf -> NBuffer .
+  op size : NBuffer -> Nat . 
+  op remove : Buffer Address -> NBuffer .
+  op _in_ : Address Buffer -> Bool .
+  op update : NBuffer EleBuf EleBuf -> NBuffer .
+  op search : Buffer Float -> Address .
+
+--- Implementações  
+
+  eq add([ SZ:Nat | B:Buffer ] , eleBuf ) = [ s(SZ:Nat) | eleBuf B:Buffer ] . 
+  eq size([ SZ:Nat | B:Buffer ]) = SZ:Nat .
+  eq update([SZ:Nat | < ads f li limI limS > B:Buffer] , < ads f li limI limS > , < nads nf nli nlimI nlimS > ) = [ (SZ:Nat) | < nads nf nli nlimI nlimS > B:Buffer ] .
+  eq update([SZ:Nat | B:Buffer], < ads f li limI limS >, < nads nf nli nlimI nlimS > ) = < ads f li limI limS > [ (SZ:Nat) | < ads f li limI limS > B:Buffer ] [owise] .
+
+  ceq search (eleBuf B:Buffer, gt ) = getAddress(eleBuf) 
+	if (gt >= (getTime( getAddress(eleBuf) , B:Buffer ) ) + Tc ) .
+  eq search(eleBuf B:Buffer, gt ) =  getAddress(eleBuf) [owise] .
+    
+  
+ ceq remove(eleBuf B:Buffer, ads ) = B:Buffer 
+  if ads == getAddress(eleBuf) .	
+  eq remove(B:Buffer , ads) = B:Buffer [owise] .
+
+  --- *** implementacao do operador IN *** ---
+  ceq ads in eleBuf B:Buffer = true 
+    if ads == getAddress(eleBuf) .
+  eq ads in B:Buffer = false [owise] .
+
+--- Fim do Buffer
+
+***( Funcoes ASV )***
+op tMedio : -> Float .
+op tMax : -> Float .
+eq tMedio = 5.0 .
+eq tMax = 5.0 .
+
+op accept-prob : Float -> Float .
+eq accept-prob(p) = floor(S * Ts) / p .
+
+op swap : Buffer EleBuf Nat -> Buffer .
+eq swap(eleBuf B:Buffer, neleBuf, s(i)) = eleBuf swap(B:Buffer, neleBuf, i) .
+eq swap(eleBuf B:Buffer, neleBuf, 0) = neleBuf B:Buffer .
+eq swap(none, neleBuf, i) = none .
+---eq swap(eleBuf B:Buffer, neleBuf, s(i)) = neleBuf B:Buffer .
+
+
+op reply : Address Buffer Float -> [ScheduleList] .
+ceq reply(server, < ads f li limI limS > B:Buffer, gt) = [gt + delayBig + delayBig, (ads <- RINGING) , drop?] ; [gt, server <- REMOVE, 0] ; [gt, server <- UPDATE(ads),0] ; reply(server, B:Buffer, gt) 
+if (f == li) .
+eq reply(server, < ads f li limI limS > B:Buffer, gt) = reply(server, B:Buffer, gt) [owise] .
+eq reply(server , none , gt) = nil .
+
+op exBuf : Float Float -> Nat .
+eq exBuf(f, li) = floor (rat((2.0 + 0.453 * exp(1.89 * (li + (- f) )))))  .
+
+
+--- ALTERAR VALOR DO 4o PARAMETRO DO BUFFER - 
+op alBuf : Buffer Nat -> Buffer . --- alterar buffer
+
+ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat (n:Nat + 4) > alBuf(B:Buffer, (n:Nat + 5)) --- tentando
+  if li == f .
+ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat (n:Nat + 1) > alBuf(B:Buffer, (n:Nat + 2)) --- session conectado <= tMedio 
+  if li + (- f) <= tMedio .
+---ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat (n:Nat + 6) > alBuf(B:Buffer, (n:Nat + 7)) --- session conectado > tMedio
+ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat  (n:Nat + exBuf(li,f) ) > alBuf(B:Buffer,  (n:Nat + exBuf(li,f) + 1 ) )
+  if li + (- f) > tMedio .	
+eq alBuf(none B:Buffer, n:Nat) = B:Buffer [owise] .
+
+--- RETORNAR O MAIOR VALOR DO 4o PARAMETRO DO BUFFER 
+op retMax : Buffer Nat -> Nat .
+
+ceq retMax(< ads f li limI limS > B:Buffer, n:Nat) = retMax(B:Buffer, limS) 
+  if limS > n:Nat .
+ceq retMax(< ads f li limI limS > B:Buffer, n:Nat) = retMax(B:Buffer, n:Nat) 
+  if limS <= n:Nat .
+eq retMax(none, n:Nat) = (n:Nat + 1)  .
+
+--- REMOVER O ACTOR SORTEADO 
+op remBuf : Buffer Nat -> Buffer . --- alterar buffer
+ceq remBuf(< ads f li limI limS > B:Buffer, ran) = remBuf(B:Buffer, ran) --- tentando
+if  (ran >= limI and ran <= limS) .
+eq remBuf(none B:Buffer, ran) = B:Buffer [owise] .
+---eq remBuf(none B:Buffer, ran ,n:Nat) = B:Buffer [owise] .
+
+
+--- RETORNAR O ACTOR SORTEADO 
+op remAds : Buffer Nat Address -> Address . --- alterar buffer
+ceq remAds(< ads f li limI limS > B:Buffer, ran, nads) = remAds(B:Buffer, ran, ads) --- tentando
+if  (ran >= limI and ran <= limS) .
+eq remAds(none B:Buffer , ran, ads) = ads [owise] .
+
+
+op tesRan : -> Nat .
+eq tesRan = floor(random(counter) / 4294967296) .
+
+
+***( Funcoes ASV )***
+
+
+  op arate : Float -> Config .    ---- current attack rate
+  op crate : Float -> Config .    ---- current client request rate
+
+
+  ops lenPRAGMA lenGET : -> Nat .
+  op ran : Nat -> Bool .
+  op len : Nat -> Nat .
+  op lenBuf : -> Nat .
+  ops Ts Tc S SA LIMIT : -> [Float] .
+  op  J  : Float Float -> [Nat] .
+  op initDelay : -> [Float] .
+  op  delay : -> [Float] .
+  op delayBig : -> [Float] .
+  op timeforCall : -> [Float] .
+  op  drop? : -> [Nat] .
+  ops newAlpha newRho : -> [Float] .
+  op numberClient : -> Nat .
+  eq numberClient = 75 .
+  eq newAlpha =  float(100 / 4800) . ---0.001666667  . --- atacante 
+  eq newRho = float(numberClient / 4800) .  --- cliente (0.08 - 192)	
+  eq S = 120.0 . --- 15(6), 30 (12), 45(18), 60(24), 75(30), 90(36), 105(40), 120(46) 
+  eq SA = 120.0 . 
+  eq Ts = 0.2 . 
+  eq Tc = 0.2 .
+  eq LIMIT = 40.0 .
+  eq J(Rho,Alpha) = 7 . --- the maximum number of consecutive time windows a client tries to send REQs to the server before it gives up 
+  eq initDelay = 0.05 .
+  eq delay = 0.1 .
+  eq delayBig = 0.4 .
+  eq timeforCall = 1.0 .
+  eq drop? = 0 .
+ --- eq lenPRAGMA = floor(random(3) / 10000000) .
+ --- eq lenGET = floor(random(1) / 1000000) . 
+  eq lenPRAGMA = 68 .
+  eq lenGET = 284 .
+  eq ran(N:Nat) = float(random(N:Nat) / 4294967295) > 0.5 .
+
+
+--- VARIABLES
+  vars Ser Cli Actor : Address . --- Server, Client, Attacker
+  var AS : AttributeSet . --- AttributeSet
+  vars gt Rho r Alpha p t t' : Float . --- global time
+  var  tts : Float . --- Tempo entre um request e um response
+  vars i i' j k N SZ SZC : Nat . --- contains the count of requests that have already been sent
+  var SL : ScheduleList .
+---  var CONNECT : Contents .
+  var m : Msg .
+  vars Buf ListReq : Buffer . 
+  var lenPack : Nat .
+  
+--- END OF VARIABLES
+
+--- ESTADO INICIAL
+var S : Scheduler .
+op buffer : -> Buffer .
+op attributeS : -> AttributeSet .
+op initial : -> Config .
+op initStat : -> Config . 
+op initState : -> Config . 
+op scheduleList : -> ScheduleList .
+	
+eq initState = flag(true, 1.0) arate(newAlpha) crate(newRho)  ---{ 0.0 | nil } 
+	<name: server | req-cnt: 1.0 , conn-set: [0 | none] , req-set: [0 | none] , cnt: 0 , suc-get: 0 , none > 
+	<name: g | server: server, cnt: 0 , none > ---(g <- spawn)
+	<name: ga | server: server, cnt: 0 , none >
+        mytick(insert( insert( insert ({ 0.0 | nil} , [ initDelay, (ga <- spawn ), 0 ] ), [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) )  .
+	---mytick(insert( insert ({ 0.0 | nil } , [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) ) .
+	--- mytick( insert( { 0.0 | nil }, [ initDelay, (g <- spawn), 0] ) ) .
+---mytick(insert( { 0.0 | nil } , 
+	---	  [ initDelay , (g <- spawn ), 0 ] ) ) .	
+
+--- FIM DO ESTADO INICIAL
+
+--- REESCRITAS ---
+  crl[stop] :
+     flag(true,r) { gt | SL }
+   =>
+     flag(false,r) mytick({gt | SL})
+      if gt >= LIMIT .
+
+--- SERVER ---
+
+op emptyServer : -> Actor .
+op checkEmpty : Config -> Bool .
+eq checkEmpty (emptyServer C:Config) = true .
+eq checkEmpty (C:Config) = false [owise] .
+
+  rl [ServerINVITE] : 
+     	flag(true, r) { gt | SL }
+     	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k ,  AS > 
+    	 (Ser <- INVITE(Actor))
+     => flag(gt <= LIMIT * r, r)
+         if (float(SZC) >= floor(S * Ts) and not(Actor in Buf) ) then --- se buffer de conexao esta cheio e o cliente n esta no buffer
+	  	if (sampleBerWithP(accept-prob(p))) then --- modificar
+		<name: Ser | req-cnt: (p + 1.0) , conn-set: add([SZC + (-1) | remBuf(alBuf(Buf,0), sampleUniWithInt( retMax(alBuf(Buf,0),0) ) )], < Actor gt gt 0 0 > ), req-set: add( [SZ | ListReq], < Actor gt gt 0 0 > ), cnt: s(i) , suc-get: retMax(Buf, 0) , AS >	 
+		mytick(insert( insert({ gt | SL}, [gt + delay, Actor <- TRYING, 0] ), [gt + delay, (remAds(alBuf(Buf,0), sampleUniWithInt( retMax(alBuf(Buf,0),0) ), Actor ) <- poll), 0] ) )
+		else
+	           <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: s(i) , suc-get: k , AS >
+   		   mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )
+               fi 
+        else --- se buffer de resposta n esta cheio, probabilidade em conexao e add em resposta
+		if(Actor in Buf) then
+		    if (Actor in ListReq) then
+	    <name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ + (-1) | remove(ListReq, Actor) ], cnt: i , suc-get: k , AS >
+	     mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )  
+	    	   else
+	     <name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
+	     mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) ) 
+	           fi
+		else
+		<name: Ser | req-cnt: p , conn-set: add( [SZC | Buf], < Actor gt gt 0 0 > ) , req-set: add( [SZ | ListReq], < Actor gt gt 0 0 > ), cnt: s(i) , suc-get: s(k) , AS >
+	      mytick(insert({ gt | SL}, [gt + delay, Actor <- TRYING, 0] ) )	
+		fi
+	  ---    mytick( insert( insert ( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ), [gt + delay, (Actor <- TRYING), 0] ) )	
+	fi .
+
+    rl [ServerBYE] : 
+     	flag(true, r) { gt | SL }
+     	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k ,  AS > 
+    	 (Ser <- BYE(Actor))
+     => flag(gt <= LIMIT * r, r)
+	if(Actor in Buf) then
+	<name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
+	 mytick(insert( { gt | SL } , [ gt + delay , (Actor <- ACK), 0 ] ) ) 
+	 ---mytick({gt | SL }) 
+	else
+	 <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k ,  AS > 
+	mytick({gt | SL }) 
+	fi .
+	 
+    rl[ServerRemove]:
+       flag(true, r) 
+       <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
+      (Ser <- REMOVE) { gt | SL }
+     => flag(gt <= LIMIT * r, r)
+	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [0 | none], cnt: i , suc-get: k , AS >
+	mytick({ gt | SL }) . 
+
+    rl[ServerUpdate]:
+	flag(true,r)
+	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
+        (Ser <- UPDATE(Actor)) { gt | SL }	
+    => flag(gt <= LIMIT * r, r)
+	<name: Ser | req-cnt: (p) , conn-set: update( [SZC | Buf], < Actor (getTime(Actor, Buf)) getLastTime(Actor, Buf) getLimI(Actor, Buf) getLimS(Actor, Buf) >, < Actor getTime(Actor, Buf) gt getLimI(Actor, Buf) getLimS(Actor, Buf) > ) , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS >
+       mytick({gt | SL }) .		
+
+    rl[ServerTimeoutReq]: 
+       flag(true, r) 
+       <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
+      (Ser <- TIMEOUT) { gt | SL }
+     => flag(gt <= LIMIT * r, r)
+	<name: Ser | req-cnt: (floor(S * Ts) + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS >  
+	mytick( insert( insertList( { gt | SL } , reply(Ser, Buf, gt) ) , [ gt + Ts , (server <- TIMEOUT), 0] )) . 
+
+
+--- END OF SERVER ---
+
+
+--- CLIENT ---
+
+--- Equação para gerar clientes
+
+--- Clients coming in at the rate of Rho * S
+    eq crate(Rho)
+     <name: g | server: Ser, cnt: i , AS > (g <- spawn) { gt | SL }
+     = crate(Rho)
+        <name: g | server: Ser , cnt: s(i) , AS > 
+        <name: c(i) | server: Ser , retries: 0 , atime: gt , stime: Infinity , status: none, call: incomplete , AS > 
+        mytick(insert(insert( { gt | SL } ,
+           [ gt  , (c(i) <- poll), 0 ] ) ,
+	   [ (1.0  / (Rho * SA)) + (gt)  , (g <- spawn), 0 ] ) ) . 
+---	   [ ((genRandom(0.9999, 0.0001)) / 70.875) + (gt)  , (g <- spawn), 0 ] ) ) .
+--- Fim da Equacao  mi = 1.875
+
+   rl [CliSendINVITE] : 
+        flag(true, r) crate(Rho) arate(Alpha)
+        <name: c(i) | server: Ser , retries: j , status: none, call: incomplete, AS >
+        (c(i) <- poll) { gt | SL }
+     => flag(gt <= LIMIT * r, r) crate(Rho) arate(Alpha)
+        if (j <= J(Rho,Alpha)) then
+          <name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+         --- mytick(insert( insert( { gt | SL }, [ gt + delay, (Ser <- INVITE(c(i))), 0 ] ), [ gt + Tc + gt , (c(i) <- poll), 0 ] )) 
+	 mytick(insert ( { gt | SL}, [ gt + delay, (Ser <- INVITE(c(i))), 0 ]  )  ) 
+        else
+          <name: c(i) | server: Ser , retries: j , status: none, call: incomplete, AS >
+          mytick({ gt | SL })
+        fi .
+
+    rl [CliRecTRYING] : 
+        flag(true, r) { gt | SL }
+        <name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+       (c(i) <- TRYING)
+     => flag(gt <= LIMIT * r, r)
+	<name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+	---mytick(insert( { gt | SL } ,[ gt + delay + delay + delay + delay, (c(i) <- poll), 0 ] ) ) .         	
+  	mytick({ gt | SL }) .
+
+    rl [CliRecRINGING] : 
+        flag(true, r) { gt | SL }
+---	<name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+        <name: c(i) | server: Ser , stime: Infinity , retries: j , status: invite, call: incomplete, AS > 
+        (c(i) <- RINGING )
+     => flag(gt <= LIMIT * r, r)
+	<name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: incomplete, AS > 
+---	<name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS >
+	---mytick(insert( { gt | SL } , [ gt + tMedio, (Ser <- BYE(c(i)) ), 0 ] ) )  .
+	mytick(insert( { gt | SL } , [ ((genRandom(0.9999, 0.0001)) / 0.2) + (gt), (Ser <- BYE(c(i)) ), 0 ] ) )  .
+		
+  rl [CliRestartIfDontGetCall] : 
+        flag(true, r) { gt | SL }
+        <name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+       (c(i) <- poll)	
+     => flag(gt <= LIMIT * r, r) 
+        <name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+	mytick({ gt | SL }) .        
+	---mytick(insert( { gt | SL } , [ gt + delay , Ser <- GET(c(i),len(lenGET)), 0 ] ) )  .
+
+   rl[CliFIM] :
+      flag(true,r) { gt | SL }
+      (c(i) <- poll)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS >
+ ---     <name: c(i) | server: Ser , stime: Infinity , retries: j , status: connected, call: incomplete, AS >
+     => flag(gt <= LIMIT * r, r)
+         <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS >
+---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: incomplete, AS > 
+      mytick({ gt | SL }) .
+
+   rl[CliFIM2] :
+      flag(true,r) { gt | SL }
+      (c(i) <- ACK)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS > 
+---      <name: c(i) | server: Ser , stime: Infinity , retries: j , status: connected, call: incomplete, AS >
+     => flag(gt <= LIMIT * r, r)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: complete, AS >
+---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: complete, AS > 
+      mytick({ gt | SL }) .
+
+    rl[CliNotRestartAfterCall3] :
+      flag(true,r) { gt | SL }
+      (c(i) <- RINGING)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS >
+     => flag(gt <= LIMIT * r, r)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS > 
+      mytick({ gt | SL }) . 
+
+     rl[CliNotRestartAfterCall3] :
+      flag(true,r) { gt | SL }
+      (c(i) <- RINGING)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS >
+     => flag(gt <= LIMIT * r, r)
+      <name: c(i) | server: Ser , retries: j , status: connected, call: incomplete, AS > 
+      mytick({ gt | SL }) .  	 	
+
+      rl[CliRESTART] :
+      flag(true,r) { gt | SL }
+      (c(i) <- poll)
+       <name: c(i) | server: Ser , retries: j , status: invite, call: incomplete, AS >
+---      <name: c(i) | server: Ser , stime: Infinity , retries: j , status: invite, call: incomplete, AS >
+     => flag(gt <= LIMIT * r, r)
+        <name: c(i) | server: Ser , retries: j , status: none, call: incomplete, AS > 
+---      <name: c(i) | server: Ser , stime: gt , retries: j , status: none, call: incomplete, AS > 
+      mytick({ gt | SL }) .
+
+--- END OF CLIENT ---
+
+--- ATTACKER ---
+
+
+--- Attackers coming in at the rate of Rho * S
+    eq arate(Alpha)
+       <name: ga | server: Ser, cnt: i , AS > (ga <- spawn) { gt | SL }
+     = arate(Alpha)
+        <name: ga | server: Ser , cnt: s(i) , AS > 
+        <name: a(i) | server: Ser , atime: gt , stime: Infinity ,status: none , AS >  
+        mytick(insert(insert( { gt | SL } ,
+           [ gt  , (a(i) <- poll), 0 ] ) ,
+	   [ (1.0  / (Alpha * SA)) + (gt)  , (ga <- spawn), 0 ] ) ) . 
+
+--- Automato = none -> get -> pragma <-> pragma
+  rl [ATSendINVITE] : 
+        flag(true, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser , status: none , AS > 
+        (a(i) <- poll) { gt | SL }
+     => flag(gt <= LIMIT * r, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser , status: invite , AS > 
+        mytick(insert( { gt | SL } ,
+        [ gt + delay, (Ser <- INVITE(a(i))), 0 ] ) ) .
+
+ rl [ATSendRecTRYING] : 
+        flag(true, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser , status: invite , AS > 
+        (a(i) <- TRYING) { gt | SL } 
+     => flag(gt <= LIMIT * r, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser, status: invite , AS > 
+        mytick(insert( { gt | SL } ,[ gt + delay + delay + delay + delay, (a(i) <- poll), 0 ] ) )   .
+
+   rl [ATRecRINGING] : 
+        flag(true, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser , status: invite , AS > 
+        (a(i) <- RINGING) { gt | SL } 
+     => flag(gt <= LIMIT * r, r) arate(Alpha) crate(Rho)
+        <name: a(i) | server: Ser, status: oncall ,AS > 
+	 mytick(insert( { gt | SL } , [ gt + delay, (Ser <- INVITE(a(i))), 0 ] ) ) .
+ 	---mytick(insert( insert ( { gt | SL } , [ gt + delay, (Ser <- GET(a(i),len(lenGET))), 0 ] ), [ gt + delay + delay, (a(i) <- poll), 0] ) ) .
+  
+   crl [Restart-Timeout-Attacker-none] :
+	(a(i) <- RINGING) { gt | SL } 
+	<name: a(i) | server: Ser , status: none , AS >  
+   =>
+      <name: a(i) | server: Ser , status: none , AS  >
+      mytick(insert( { gt | SL } , [ gt + delay , (a(i) <- poll), 0 ] ) ) 	 
+    if gt > 0.0 .
+
+ crl [Restart-Timeout-Attacker-none2] :
+	(a(i) <- poll) { gt | SL } 
+	<name: a(i) | server: Ser , status: invite , AS >  
+   =>
+      <name: a(i) | server: Ser , status: invite , AS  >
+     mytick({ gt | SL } ) 	 
+    if gt > 0.0 .
+
+  crl [Restart-Timeout-Attacker-none3] :
+	(a(i) <- RINGING) { gt | SL } 
+	<name: a(i) | server: Ser , status: oncall , AS >  
+   =>
+      <name: a(i) | server: Ser , status: oncall , AS  >
+     mytick({ gt | SL } ) 	 
+    if gt > 0.0 .
+
+ crl [Restart-Timeout-Attacker-none2] :
+	(a(i) <- TRYING) { gt | SL } 
+	<name: a(i) | server: Ser , status: oncall , AS >  
+   =>
+      <name: a(i) | server: Ser , status: oncall , AS  >
+     mytick({ gt | SL } ) 	 
+    if gt > 0.0 .
+
+ rl [attack-end] :
+	(a(i) <- poll) { gt | SL } 
+	<name: a(i) | server: Ser , stime: Infinity , status: oncall , AS >  
+   =>
+      <name: a(i) | server: Ser ,  stime: gt  , status: oncall , AS  >
+     mytick({ gt | SL } ) .
+
+--- END OF ATTACKER ---	
+
+
+--- *** PVeSTa *** ---
+
+var P : Float .
+var C : Config .
+var b : Bool .
+op countConnectedAT : Float Config -> Float .
+op countConnected : Float Config -> Float .
+op countConnectedIN : Float Config -> Float .
+op  countClients : Config -> Float .
+op countAttackers : Config -> Float .
+op countDenialPragma : Config -> Float .
+op countConAttacker : Float Config -> Float .
+op val : Nat Config -> Float .
+op sat : Nat Config -> Bool .
+op networkTraffic : Config -> Float .
+op countPragma : Config -> Float .
+
+--- Success Probability
+op hasConnected : Nat Config -> Float .
+
+eq hasConnected(i, <name: c(i) | status: connected , AS > C ) = 1.0 .
+eq hasConnected(i, C) = 0.0 [owise] .
+
+eq countConnected(p, <name: c(i) | status: connected , AS > C ) = countConnected(p + 1.0 , C) .
+eq countConnected(p,C) = p [owise] .
+
+***(
+eq countConnected(p, <name: c(i) | status: connected , call: complete,  AS > C ) = countConnected(p + 1.0 , C) .
+eq countConnected(p,C) = p [owise] .
+)***
+---***(
+eq countConnectedIN(p, <name: c(i) | status: connected , call: incomplete,  AS > C ) = countConnectedIN(p + 1.0 , C) .
+eq countConnectedIN(p,C) = p [owise] .
+---)***
+
+
+eq countClients(<name: g | cnt: i , AS > C) = float(i) .
+---eq countAttackers(<name: ga | cnt: i , AS > C) = float(i) .
+eq networkTraffic(<name: Ser | cnt: i , suc-get: k , AS > C) = float(i) .
+
+
+eq countConnectedAT(p, <name: a(i) | status: oncall , AS > C ) = countConnectedAT(p + 1.0 , C) .
+eq countConnectedAT(p,C) = p [owise] .
+
+  --- Average time-to-service
+  op  avgTTS : Config -> Float .
+  op  sumTTS : Float Config -> Float .
+ ceq avgTTS(C) = if r > 0.0 then sumTTS(0.0, C) / r else 0.0 fi 
+                    if r := countConnected(0.0, C) .
+***(
+  ceq sumTTS(p, <name: a(i) | atime: t , stime: t' , status: oncall , AS > C ) = sumTTS(p + ((40.0 + (- t))), C) 
+    if (t' == Infinity) .
+  ceq sumTTS(p, <name: a(i) | atime: t , stime: t' , status: oncall , AS > C ) = sumTTS(p + (t' + (- t)), C)
+    if (not(t' == Infinity)) .
+   
+  eq sumTTS(p, C) = p [owise] .  
+)***
+ eq sumTTS(p, <name: c(i) | atime: t , stime: t' , status: connected , call: incomplete , AS > C )
+     = sumTTS(p + (t' + (- t)), C) .
+  eq sumTTS(p, C) = p [owise] . 
+
+eq tick( flag(b, r) C ) = flag(true, r + 1.0) C .
+
+eq sat(0, C) = if hasConnected(0, C) > 0.0 then true else false fi .
+eq val(0,C) = countConnected(0.0,C) .
+eq val(1,C) = countClients(C) .
+eq val(2,C) = countConnected(0.0,C) / countClients(C) . 
+eq val(3,C) = countConnectedIN(0.0, C) / countClients(C) .  
+---eq val(3,C) = countConAttacker(0.0,C) .
+eq val(4,C) = countAttackers(C) .
+eq val(5,C) = networkTraffic(C) .
+eq val(6,C) = countPragma(C) .
+eq val(7,C) = avgTTS(C) .
+eq val(8,C) = countConnected(0.0,C) / countClients(C) .
+
+endm	
+
+***(
+   op  sumCON : Float Config -> Float .
+   ceq sumCON(p, <name: c(i) | atime: t , stime: t' , status: connected , AS > C ) = sumCON(p + 1.0 , C) 
+     if ( (t' + (- t)) >= tMedio ) .
+  eq sumCON(p, C) = p [owise] . 
+
+  op  sumCON2 : Float Config -> Float .
+   ceq sumCON2(p, <name: c(i) | atime: t , stime: t' , status: connected , AS > C ) = sumCON2(p + 1.0 , C) 
+     if ( (t' + (- t)) < tMedio ) .
+  eq sumCON2(p, C) = p [owise] .  
+)***
+
