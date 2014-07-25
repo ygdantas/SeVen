@@ -9,7 +9,11 @@ experiments/		attacks/defenses implemented in Maude
    post/		attack/defense post implemented in Maude
 maude/ 			maude tool x86
 maude64/		maude tool 64
+<<<<<<< HEAD
+maude64/		maude tool 64
+=======
 maude64/		maude tool 64		
+>>>>>>> bfaea913cd1d694d3da7c3eb8a7b6b7ae215f373
 pvesta/			pvesta tool
 
 
@@ -48,3 +52,7 @@ This code is based on the strategy developed by Jonas Eckhardt and Tobias Mühlb
 ====
 
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> bfaea913cd1d694d3da7c3eb8a7b6b7ae215f373
