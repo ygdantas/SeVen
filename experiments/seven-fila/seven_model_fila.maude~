@@ -137,6 +137,7 @@ vars lenP nlenP : Nat .
   op GET : Address Nat -> Contents .
   op PRAGMA : Address Nat -> Contents . --- endereço, tamanho do pacote pragma
   op ACK : -> Contents .
+  op REMOVE : -> Contents .
   op END : -> Contents .
   op TIMEOUT : Address -> Contents .
   op TIMEOUT : -> Contents .
@@ -254,6 +255,10 @@ op reply : Address Buffer Float -> [ScheduleList] .
 eq reply(server, < ads f li lenP > B:Buffer, gt) = [gt + delay , (ads <- ACK) , drop?] ; reply(server, B:Buffer, gt)  .
 eq reply(server , none , gt) = nil .
 
+op replyQueue : Address Buffer Float -> [ScheduleList] .
+eq replyQueue(server, < ads f li lenP > B:Buffer, gt) = [gt , (server <- GET(ads , len( lenP ))) , drop?] ; [gt , ads <- REMOVE , 0] .
+--- eq replyQueue(server , none , gt) = nil .
+
 ***( Funcoes ASV )***
 
   op arate : Float -> Config .    ---- current attack rate
@@ -272,7 +277,7 @@ eq reply(server , none , gt) = nil .
   ops newAlpha newRho : -> [Float] .
   eq newAlpha =  float(280 / 4800) . ---0.001666667  . --- atacante 
   eq newRho = float(200 / 4800) .  --- cliente (0.08 - 192)	
-  eq S = 30.0 . --- 15(6), 30 (12), 45(18), 60(24), 75(30) 
+  eq S = 15.0 . --- 15(6), 30 (12), 45(18), 60(24), 75(30) 
   eq SA = 120.0 . 
   eq Ts = 0.4 . 
   eq Tc = 0.4 .
@@ -344,42 +349,21 @@ eq checkEmpty (C:Config) = false [owise] .
      => flag(gt <= LIMIT * r, r)
          if (float(SZC) >= floor(S * Ts) and not(Actor in Buf) ) then --- se buffer de conexao esta cheio e o cliente n esta no buffer
 		---emptyServer { gt | SL } ---***(
-	    if (float(SZ) >= floor(S * Ts)) then --- se buffer de resposta esta cheio
+	    if (float(SZ) >= floor(S * Ts)) then --- se a lista de resposta esta cheio
 	  	if (sampleBerWithP(accept-prob(p))) then --- se true, troca faz a trocar de Actors no buffer, cc faz nada
-	  	   <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | swap(Buf, < Actor gt gt SZC >, sampleUniWithInt(SZC) )] , req-set: [SZ | swap(ListReq, < Actor gt gt lenPack >, sampleUniWithInt(SZ))], cnt: s(i) , suc-get: s(k) ,AS > 
+	  	   <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | swap(ListReq, < Actor gt gt lenPack >, sampleUniWithInt(SZ))], cnt: s(i) , suc-get: s(k) ,AS > 
 		mytick( insert( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ) )
 	        else
 	           <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: s(i) , suc-get: k , AS >
 	           mytick({gt | SL }) 
                fi 
-            else --- se buffer de resposta n esta cheio, probabilidade em conexao e add em resposta
-		if (sampleBerWithP(accept-prob(p))) then --- se true, troca faz a trocar de Actors no buffer, cc faz nada
-	  	   <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | swap(Buf, < Actor gt gt SZC >, sampleUniWithInt(SZC) )] , req-set: add( [SZ | ListReq], < Actor gt gt lenPack > ), cnt: s(i) , suc-get: s(k) ,AS > 
-		mytick( insert( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ) )
-	        else
-	           <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: s(i) , suc-get: k , AS >
-	           mytick({gt | SL }) 
-                fi
+            else --- se o buffer actives estiver cheio e a lista nao, add na lista
+		<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: add( [SZ | ListReq], < Actor gt gt lenPack > ), cnt: s(i) , suc-get: s(k) , AS >
+		mytick({gt | SL })
             fi --- )***
-	else
-	   if (float(SZC) < floor(S * Ts) and not(Actor in Buf)) then --- se conexao nao esta cheio e cliente n esta no buffer
-	     if (float(SZ) >= floor(S * Ts)) then --- se buffer de resposta esta cheio
-		if (sampleBerWithP(accept-prob(p))) then --- se true, troca faz a trocar de Actors no buffer, cc faz nada
-	  	   <name: Ser | req-cnt: (p + 1.0) , conn-set: add( [SZC | Buf], < Actor gt gt lenPack > ) , req-set: [SZ | swap(ListReq, < Actor gt gt lenPack >, sampleUniWithInt(SZ))], cnt: s(i) , suc-get: s(k) ,AS > 
-		mytick( insert( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ) )
-	        else
-	           <name: Ser | req-cnt: (p + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: s(i) , suc-get: k , AS >
-	           mytick({gt | SL }) 
-                fi
-	     else
-		<name: Ser | req-cnt: p , conn-set: add( [SZC | Buf], < Actor gt gt lenPack > ) , req-set: add( [SZ | ListReq], < Actor gt gt lenPack > ), cnt: s(i) , suc-get: s(k) , AS >
-	      mytick( insert( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ) )
-	     fi
-	   else --- cliente ja esta no buffer
-		--- emptyServer
-		 <name: Ser | req-cnt: (p) , conn-set: update( [SZC | Buf], < Actor (getTime(Actor, Buf)) getLastTime(Actor, Buf) getLenGET(Actor, Buf) >, < Actor getTime(Actor, Buf) gt getLenGET(Actor, Buf) > ) , req-set: [SZ | ListReq], cnt: s(i) , suc-get: k , AS >
-	           mytick({gt | SL }) 
-	    fi 
+	else --- lista de actives nao esta cheio, apenas add
+	<name: Ser | req-cnt: p , conn-set: add( [SZC | Buf], < Actor gt gt lenPack > ) , req-set: [SZ | ListReq], cnt: s(i) , suc-get: s(k) , AS >
+	      mytick( insert( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ) )	
 	fi .
 
 
@@ -388,7 +372,7 @@ eq checkEmpty (C:Config) = false [owise] .
        <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
       (Ser <- TIMEOUT) { gt | SL }
      => flag(gt <= LIMIT * r, r)
-	<name: Ser | req-cnt: (floor(S * Ts) + 1.0) , conn-set: [SZC | Buf] , req-set: [0 | none], cnt: i , suc-get: k , AS >  
+	<name: Ser | req-cnt: (floor(S * Ts) + 1.0) , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS >  
 	mytick( insert( insertList( { gt | SL } , reply(Ser, Buf, gt) ) , [ gt + Ts , (server <- TIMEOUT), 0] )) . 
 	
     rl[ServerTimeoutConn]: 
@@ -396,18 +380,25 @@ eq checkEmpty (C:Config) = false [owise] .
       <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
       (Ser <- TIMEOUT (Actor)) { gt | SL }
      => flag(gt <= LIMIT * r, r) 
-       if ( (Actor in Buf) and (gt > (getLastTime(Actor , Buf ) ) + Tc)) then
-	     if (Actor in ListReq) then
-	    <name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ + (-1) | remove(ListReq, Actor) ], cnt: i , suc-get: k , AS >
-	     mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )  
-	    else
+       if ( (Actor in Buf) and (gt >= (getLastTime(Actor , Buf ) ) + Tc)) then
 	     <name: Ser | req-cnt: p , conn-set: [SZC + (-1) | remove(Buf, Actor) ] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
-	     mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) ) 
-	    fi
+	---     mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )
+		if(SZ > 0) then --- se tem alguem na lista
+			mytick( insert( insertList( { gt | SL } , [ gt , replyQueue(Ser,ListReq, gt), 0 ] ), [ gt + delay , (Actor <- poll), 0] )) 
+		else
+			mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )
+		fi   
 	else
 	   <name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS > 
 	    mytick({ gt | SL })
          fi .
+
+  rl[ServerRemove]:
+	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ | ListReq], cnt: i , suc-get: k , AS >
+	(Actor <- REMOVE) { gt | SL }
+    =>
+	<name: Ser | req-cnt: p , conn-set: [SZC | Buf] , req-set: [SZ + (-1) | remove(ListReq, Actor) ], cnt: i , suc-get: k , AS >
+	mytick({ gt | SL }) .
 
 --- TODO PRAGMA e ENVIO DE PACOTES PRAGMA PELO ATACANTE
 
