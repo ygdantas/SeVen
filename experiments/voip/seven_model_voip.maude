@@ -583,7 +583,17 @@ eq checkEmpty (C:Config) = false [owise] .
      => flag(gt <= LIMIT * r, r)
          <name: c(i) | server: Ser , retries: j , status: invite, AS >
 ---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: incomplete, AS > 
-        mytick({ gt | SL }) .   
+        mytick({ gt | SL }) .
+
+   rl [CliEnd-ACK-with-incomplete] :
+      flag(true,r) { gt | SL }
+      <name: c(i) | server: Ser , retries: j , status: incomplete, AS >
+      (c(i) <- ACK)
+---      <name: c(i) | server: Ser , stime: Infinity , retries: j , status: connected, AS >
+     => flag(gt <= LIMIT * r, r)
+      <name: c(i) | server: Ser , retries: j , status: incomplete, AS >
+---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: complete, AS > 
+      mytick({ gt | SL }) .   
 
 ***(
       rl [CliRESTART] :

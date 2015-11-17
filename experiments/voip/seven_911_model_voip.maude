@@ -334,7 +334,7 @@ eq tesRan = floor(random(counter) / 4294967296) .
   ops newAlpha newRho : -> [Float] .
   ops numberClient numberAttacker : -> Nat .
   eq numberClient = 24 . 
-  eq numberAttacker = 60 .
+  eq numberAttacker = 72 .
   eq newAlpha =  (float(numberAttacker) / 4800.0) . ---0.001666667  . --- atacante 
   eq newRho = (float(numberClient)  / 4800.0) .  --- cliente (0.08 - 192)
   eq lenBufSeVen = 24.0 .	
@@ -585,6 +585,16 @@ eq checkEmpty (C:Config) = false [owise] .
 ---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: incomplete, AS > 
         mytick({ gt | SL }) .   
 
+
+   rl [CliEnd-ACK-with-incomplete] :
+      flag(true,r) { gt | SL }
+      <name: c(i) | server: Ser , retries: j , status: incomplete, AS >
+      (c(i) <- ACK)
+---      <name: c(i) | server: Ser , stime: Infinity , retries: j , status: connected, AS >
+     => flag(gt <= LIMIT * r, r)
+      <name: c(i) | server: Ser , retries: j , status: incomplete, AS >
+---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: complete, AS > 
+      mytick({ gt | SL }) .
 ***(
       rl [CliRESTART] :
         flag(true,r) { gt | SL }
