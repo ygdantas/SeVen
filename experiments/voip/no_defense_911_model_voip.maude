@@ -276,7 +276,7 @@ eq exBuf(gt:Float, f) = floor (rat((2.0 + 0.453 * exp(1.89 * (gt:Float + (- f) )
 --- ALTERAR VALOR DO 4o PARAMETRO DO BUFFER - 
 op alBuf : Buffer Nat Float -> Buffer . --- alterar buffer
 
-ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + 4) > alBuf(B:Buffer, (n:Nat + 5), gt:Float) --- tentando
+ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + 9) > alBuf(B:Buffer, (n:Nat + 10), gt:Float) --- tentando
   if li == f .
 ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + 1) > alBuf(B:Buffer, (n:Nat + 2), gt:Float) --- session conectado <= tMedio 
   if (li =/= f) and gt + (- f) <= tMedio .
@@ -381,7 +381,8 @@ eq initState = flag(true, 1.0) arate(newAlpha) crate(newRho)  ---{ 0.0 | nil }
 	<name: server | req-cnt: 1.0 , conn-set: [0 | none] , req-set: [0 | none] , cnt: 0 , suc-get: 0 , none > 
 	<name: g | server: server, cnt: 0 , none > ---(g <- spawn)
 	<name: ga | server: server, cnt: 0 , none >
-        mytick(insert( insert( insert ({ 0.0 | nil} , [ initDelay, (ga <- spawn ), 0 ] ), [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) )  .
+  ---      mytick(insert( insert( insert ({ 0.0 | nil} , [ initDelay, (ga <- spawn ), 0 ] ), [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) )  .
+  mytick(insert( insert( { 0.0 | nil} , [ initDelay, (ga <- spawn ), 0 ] ), [ initDelay , (g <- spawn ), 0 ] ) )  .
 ---mytick(insert( insert ({ 0.0 | nil } , [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) ) .
 	--- mytick( insert( { 0.0 | nil }, [ initDelay, (g <- spawn), 0] ) ) .
 ---mytick(insert( { 0.0 | nil } , 
@@ -409,28 +410,12 @@ eq checkEmpty (C:Config) = false [owise] .
      (Ser <- INVITE(Actor))
      => flag(gt <= LIMIT * r, r)
       if (float(lenP) >= floor(lenBufSeVen)) then --- se buffer de conexao esta cheio e o cliente n esta no buffer
-	  	      if (sampleBerWithP(accept-prob(pmod))) then --- modificar
-		          <name: Ser | req-cnt: (pmod + 1.0) , conn-set: add([lenP + (-1) | remBuf(alBuf(P,0,gt), sampleUniWithInt( retMax(alBuf(P,0,gt),0) ) )], < Actor gt gt 0 0 > ), req-set: add( [lenR | R], < Actor gt gt 0 0 > ), cnt: s(i) , suc-get: retMax(P, 0) , AS >	 
-		          mytick(insert( insert({ gt | SL}, [gt + delay, Actor <- TRYING, 0] ), [gt + delay, (remAds(alBuf(P,0,gt), sampleUniWithInt( retMax(alBuf(P,0,gt),0) ), Actor ) <- poll), 0] ) ) --- send try to new actor and poll to the actor who was removed.
-		        else
-	           <name: Ser | req-cnt: (pmod + 1.0) , conn-set: [lenP | P] , req-set: [lenR | R], cnt: s(i) , suc-get: k , AS >
-   		       mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )
-            fi 
-      else --- se buffer de resposta n esta cheio, probabilidade em conexao e add em resposta (MUDEI!)
-***(		      if(Actor in P) then
-		        if (Actor in R) then
-	           <name: Ser | req-cnt: pmod , conn-set: [lenP + (-1) | remove(P, Actor) ] , req-set: [lenR + (-1) | remove(R, Actor) ], cnt: i , suc-get: k , AS >
-	           mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )  
-	    	   else
-	           <name: Ser | req-cnt: pmod , conn-set: [lenP + (-1) | remove(P, Actor) ] , req-set: [lenR | R], cnt: i , suc-get: k , AS > 
-	           mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) ) 
-	         fi 
-		      else )***
-		<name: Ser | req-cnt: pmod , conn-set: add( [lenP | P], < Actor gt gt 0 0 > ) , req-set: add( [lenR | R], < Actor gt gt 0 0 > ), cnt: s(i) , suc-get: s(k) , AS >
-	      mytick(insert({ gt | SL}, [gt + delay, Actor <- TRYING, 0] ) )	
-		  fi .
-	  ---    mytick( insert( insert ( { gt | SL }, [ gt + Tc , (server <- TIMEOUT(Actor) ), 0] ), [gt + delay, (Actor <- TRYING), 0] ) )	
----	fi .
+              <name: Ser | req-cnt: (pmod + 1.0) , conn-set: [lenP | P] , req-set: [lenR | R], cnt: s(i) , suc-get: k , AS >
+             mytick(insert( { gt | SL } , [ gt + delay , (Actor <- poll), 0 ] ) )  
+		  else
+	           <name: Ser | req-cnt: pmod , conn-set: add( [lenP | P], < Actor gt gt 0 0 > ) , req-set: [lenR | R], cnt: s(i) , suc-get: s(k) , AS >
+              mytick( insert( insert ( { gt | SL }, [ gt + delay , (Actor <- TRYING ), 0] ), [gt + delay + delay + delay, (Actor <- RINGING), 0] ))
+      fi .
 
     rl [ServerBYE] : 
      	flag(true, r) { gt | SL }
@@ -440,11 +425,12 @@ eq checkEmpty (C:Config) = false [owise] .
     	if(Actor in P) then
       	<name: Ser | req-cnt: pmod , conn-set: [lenP + (-1) | remove(P, Actor) ] , req-set: [lenR | R], cnt: i , suc-get: k , AS > 
       	 mytick(insert( { gt | SL } , [ gt + delay , (Actor <- ACK), 0 ] ) ) 
-	 ---mytick({gt | SL }) 
     	else
       	<name: Ser | req-cnt: pmod , conn-set: [lenP | P] , req-set: [lenR | R], cnt: i , suc-get: k ,  AS > 
       	mytick({gt | SL }) 
 	    fi .
+***(
+
 	 
     rl [ServerRemove] :
        flag(true, r) 
@@ -475,7 +461,7 @@ eq checkEmpty (C:Config) = false [owise] .
           mytick(insert ( { gt | SL}, [ gt + Ts, (server <- TIMEOUT), 0 ]  ) )  
 
        fi .             
-
+***)
 --- END OF SERVER ---
 
 
@@ -647,7 +633,7 @@ eq checkEmpty (C:Config) = false [owise] .
         (a(i) <- RINGING) { gt | SL } 
      => flag(gt <= LIMIT * r, r) arate(Alpha) crate(Rho)
         <name: a(i) | server: Ser, status: oncall ,AS >
-        mytick(insert( { gt | SL } , [ ((genRandom(0.9999, 0.0001)) / 1.0) + (gt), (Ser <- BYE(a(i)) ), 0 ] ) )  . 
+        mytick(insert( { gt | SL } , [ ((genRandom(0.9999, 0.0001)) / 0.4) + (gt), (Ser <- BYE(a(i)) ), 0 ] ) )  . 
 	 ----mytick(insert( { gt | SL } , [ gt + delay, (Ser <- INVITE(a(i))), 0 ] ) ) .
  	---mytick(insert( insert ( { gt | SL } , [ gt + delay, (Ser <- GET(a(i),len(lenGET))), 0 ] ), [ gt + delay + delay, (a(i) <- poll), 0] ) ) .
 
@@ -657,7 +643,7 @@ eq checkEmpty (C:Config) = false [owise] .
    =>
       <name: a(i) | server: Ser , status: none , AS  >
       ---mytick({ gt | SL } ) .
-      mytick(insert( { gt | SL} , [ gt + delay, (a(i) <- poll), 0 ] ) ) .
+      mytick(insert( { gt | SL} , [ gt, (a(i) <- poll), 0 ] ) ) .
 
   
     rl [Restart-Timeout-Attacker-none2] :

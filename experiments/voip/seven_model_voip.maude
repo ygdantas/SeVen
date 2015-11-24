@@ -251,7 +251,7 @@ vars limI limS nlimI nlimS ran : Nat .
 op tMedio : -> Float .
 op tMax : -> Float .
 eq tMedio = 5.0 .
-eq tMax = 4.0 .
+eq tMax = 5.0 .
 
 op accept-prob : Float -> Float .
 eq accept-prob(pmod) = floor(lenBufSeVen) / pmod .
