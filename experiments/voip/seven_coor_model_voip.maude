@@ -251,7 +251,7 @@ vars limI limS nlimI nlimS ran : Nat .
 op tMedio : -> Float .
 op tMax : -> Float .
 eq tMedio = 5.0 .
-eq tMax = 4.0 .
+eq tMax = 5.0 .
 
 op accept-prob : Float -> Float .
 eq accept-prob(pmod) = floor(lenBufSeVen) / pmod .
@@ -347,7 +347,7 @@ eq tesRan = floor(random(counter) / 4294967296) .
   ops newAlpha newRho : -> [Float] .
   ops numberClient numberAttacker : -> Nat .
   eq numberClient = 24 . 
-  eq numberAttacker = 550 .
+  eq numberAttacker = 96 .
   eq newAlpha =  (float(numberAttacker) / 4800.0) . ---0.001666667  . --- atacante 
   eq newRho = (float(numberClient)  / 4800.0) .  --- cliente (0.08 - 192)
   eq lenBufSeVen = 24.0 .	
@@ -389,8 +389,6 @@ op initial : -> Config .
 op initStat : -> Config . 
 op initState : -> Config . 
 op scheduleList : -> ScheduleList .
-
-
 	
 eq initState = flag(true, 1.0) arate(newAlpha) crate(newRho)  ---{ 0.0 | nil } 
 	<name: server | req-cnt: 1.0 , conn-set: [0 | none] , req-set: [0 | none] , cnt: 0 , suc-get: 0 , none > 
@@ -499,15 +497,15 @@ eq checkEmpty (C:Config) = false [owise] .
 --- Equação para gerar clientes
 
 --- Clients coming in at the rate of Rho * S
-    eq crate(Rho)
+    ceq crate(Rho)
      <name: g | server: Ser, cnt: i , AS > (g <- spawn) { gt | SL }
      = crate(Rho)
         <name: g | server: Ser , cnt: s(i) , AS > 
         <name: c(i) | server: Ser , retries: 0 , atime: gt , stime: Infinity , status: none , AS > 
         mytick(insert(insert( { gt | SL } ,
            [ gt  , (c(i) <- poll), 0 ] ) ,
-	   [ (1.0  / (Rho * S)) + (gt)  , (g <- spawn), 0 ] ) ) .
-    ---    if numberClient > i . 
+	   [ (1.0  / (Rho * S)) + (gt)  , (g <- spawn), 0 ] ) ) 
+        if numberClient > i . 
 --- Fim da Equacao  mi = 1.875
 
    rl [CliSendINVITE] : 
@@ -515,23 +513,15 @@ eq checkEmpty (C:Config) = false [owise] .
         <name: c(i) | server: Ser , retries: j , status: none, AS >
         (c(i) <- poll) { gt | SL }
      => flag(gt <= LIMIT * r, r) crate(Rho) arate(Alpha)
-        ---if (j <= J(Rho,Alpha)) then
           <name: c(i) | server: Ser , retries: j , status: invite, AS >
           mytick(insert ( { gt | SL}, [ gt + delay, (Ser <- INVITE(c(i))), 0 ]  )  ) .
-         --- mytick(insert( insert( { gt | SL }, [ gt + delay, (Ser <- INVITE(c(i))), 0 ] ), [ gt + Tc + gt , (c(i) <- poll), 0 ] )) 
-	     ***(    mytick(insert ( { gt | SL}, [ gt + delay, (Ser <- INVITE(c(i))), 0 ]  )  ) 
-        else
-          <name: c(i) | server: Ser , retries: j , status: none, AS >
-          mytick({ gt | SL })
-        fi . )***
 
     rl [CliRecTRYING] : 
         flag(true, r) { gt | SL }
         <name: c(i) | server: Ser , retries: j , status: invite, AS >
        (c(i) <- TRYING)
      => flag(gt <= LIMIT * r, r)
-      	<name: c(i) | server: Ser , retries: j , status: invite, AS >
-      	---mytick(insert( { gt | SL } ,[ gt + delay + delay + delay + delay, (c(i) <- poll), 0 ] ) ) .         	
+      	<name: c(i) | server: Ser , retries: j , status: invite, AS >      	
       	mytick({ gt | SL }) .
 
     rl [CliRecRINGING] : 
@@ -539,8 +529,8 @@ eq checkEmpty (C:Config) = false [owise] .
         <name: c(i) | server: Ser , stime: Infinity , retries: j , status: invite, AS > 
         (c(i) <- RINGING )
      => flag(gt <= LIMIT * r, r)
-       <name: c(i) | server: Ser , stime: (((genRandom(0.9999, 0.0001)) / 0.2) + (gt)) , retries: j , status: connected, AS >  
-       mytick(insert( { gt | SL } , [ (((genRandom(0.9999, 0.0001)) / 0.2) + (gt)), (Ser <- BYE(c(i)) ), 0 ] ) )  .
+	     <name: c(i) | server: Ser , stime: (((genRandom(0.9999, 0.0001)) / 0.2) + (gt)) , retries: j , status: connected, AS >  
+	     mytick(insert( { gt | SL } , [ (((genRandom(0.9999, 0.0001)) / 0.2) + (gt)), (Ser <- BYE(c(i)) ), 0 ] ) )  .
 
    rl [CliEnd-Incomplete-drop] :
       flag(true,r) { gt | SL }
@@ -586,8 +576,7 @@ eq checkEmpty (C:Config) = false [owise] .
      => flag(gt <= LIMIT * r, r)
          <name: c(i) | server: Ser , retries: j , status: invite, AS >
 ---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: incomplete, AS > 
-        mytick({ gt | SL }) .   
-
+        mytick({ gt | SL }) .
 
    rl [CliEnd-ACK-with-incomplete] :
       flag(true,r) { gt | SL }
@@ -597,7 +586,8 @@ eq checkEmpty (C:Config) = false [owise] .
      => flag(gt <= LIMIT * r, r)
       <name: c(i) | server: Ser , retries: j , status: incomplete, AS >
 ---      <name: c(i) | server: Ser , stime: gt , retries: j , status: connected, call: complete, AS > 
-      mytick({ gt | SL }) .
+      mytick({ gt | SL }) .   
+
 ***(
       rl [CliRESTART] :
         flag(true,r) { gt | SL }
@@ -615,15 +605,15 @@ eq checkEmpty (C:Config) = false [owise] .
 
 
 --- Attackers coming in at the rate of Rho * S
-    eq arate(Alpha)
+    ceq arate(Alpha)
        <name: ga | server: Ser, cnt: i , AS > (ga <- spawn) { gt | SL }
      = arate(Alpha)
         <name: ga | server: Ser , cnt: s(i) , AS > 
         <name: a(i) | server: Ser , atime: gt , stime: Infinity ,status: none , AS >  
         mytick(insert(insert( { gt | SL } ,
            [ gt  , (a(i) <- poll), 0 ] ) ,
-	     [ (1.0  / (Alpha * SA)) + (gt)  , (ga <- spawn), 0 ] ) ) .
----    if numberAttacker > i .
+	     [ (1.0  / (Alpha * SA)) + (gt)  , (ga <- spawn), 0 ] ) ) 
+    if numberAttacker > i .
 
 --- Automato = none -> get -> pragma <-> pragma
   rl [ATSendINVITE] : 
@@ -650,18 +640,9 @@ eq checkEmpty (C:Config) = false [owise] .
         (a(i) <- RINGING) { gt | SL } 
      => flag(gt <= LIMIT * r, r) arate(Alpha) crate(Rho)
         <name: a(i) | server: Ser, status: oncall ,AS >
-        mytick(insert( { gt | SL } , [ ((genRandom(0.9999, 0.0001)) / 1.0) + (gt), (Ser <- BYE(a(i)) ), 0 ] ) )  . 
+        mytick({ gt | SL }) . 
 	 ----mytick(insert( { gt | SL } , [ gt + delay, (Ser <- INVITE(a(i))), 0 ] ) ) .
  	---mytick(insert( insert ( { gt | SL } , [ gt + delay, (Ser <- GET(a(i),len(lenGET))), 0 ] ), [ gt + delay + delay, (a(i) <- poll), 0] ) ) .
-
-    rl [Restart-Timeout-Attacker-none2] :
-      (a(i) <- ACK) { gt | SL } 
-      <name: a(i) | server: Ser , status: oncall , AS >  
-   =>
-      <name: a(i) | server: Ser , status: none , AS  >
-      ---mytick({ gt | SL } ) .
-      mytick(insert( { gt | SL} , [ gt + delay, (a(i) <- poll), 0 ] ) ) .
-
   
     rl [Restart-Timeout-Attacker-none2] :
     	(a(i) <- poll) { gt | SL } 
@@ -749,7 +730,14 @@ eq countConnectedAT(pv-f,C) = pv-f [owise] .
   op  sumTTS : Float Config -> Float .
  ceq avgTTS(C) = if r > 0.0 then sumTTS(0.0, C) / r else 0.0 fi 
                     if r := countConnectedIN(0.0, C) .
-
+***(
+  ceq sumTTS(pmod, <name: a(i) | atime: t , stime: t' , status: oncall , AS > C ) = sumTTS(pmod + ((40.0 + (- t))), C) 
+    if (t' == Infinity) .
+  ceq sumTTS(pmod, <name: a(i) | atime: t , stime: t' , status: oncall , AS > C ) = sumTTS(pmod + (t' + (- t)), C)
+    if (not(t' == Infinity)) .
+   
+  eq sumTTS(pmod, C) = pmod [owise] .  
+)***
  eq sumTTS(pv-f, <name: c(i) | atime: t , stime: t' , status: incomplete, AS > C )
      = sumTTS(pv-f + (t / t'), C) .
   eq sumTTS(pv-f, C) = pv-f [owise] . 
@@ -761,8 +749,8 @@ eq val(0,C) = countConnectedFIN(0.0,C) .
 eq val(1,C) = countClients(C) .
 eq val(2,C) = countAttackers(C) .
 eq val(3,C) = (countConnectedCON(0.0,C) + countConnectedFIN(0.0,C)) / countClients(C) . 
----eq val(4,C) = countConnectedIN(0.0, C) / countClients(C) .
-eq val(4,C) = countConnectedIN(0.0, C) .  
+eq val(4,C) = countConnectedIN(0.0, C) / countClients(C) .
+---eq val(4,C) = countConnectedIN(0.0, C).  
 eq val(5,C) = countConnectedDoS(0.0, C) / countClients(C) .
 eq val(6,C) = avgTTS(C) .
 eq val(7,C) = countPragma(C) .
