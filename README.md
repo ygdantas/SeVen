@@ -17,22 +17,21 @@ maude64/		maude tool 64
 pvesta/			pvesta tool
 
 
-II. In order to run an experiment, run as following:
+II. How to run an experiment:
 
-1) Enter into the folder of an attack e open two terminals (server and client), example:
+1) Choose one folder (attacks) and open two terminals (server and client), for instance:
 
  cd experiments/get-flood/
 
-In one of terminals, run the script from server:
+In one, run the script of the server
 
  ./run-server-example.sh
 
-In other, run the script from client:
+In other, run the script of the client:
 
  ./run-client-example.sh
 
-Results are displayed once the verification task is completed. The servers will continue to run waiting for further simulation requests for ASV.
-
+Results are displayed once the verification task is completed. The servers will continue to run waiting for further simulation requests.
 
 III. There is a file called success.quatex in each folder within of experiments, as following:
 
