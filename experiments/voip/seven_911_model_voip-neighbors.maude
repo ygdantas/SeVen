@@ -318,6 +318,8 @@ ceq remBuf(< ads f li limI limS > B:Buffer, ran) = remBuf(remTwoNeighbor(B:Buffe
 eq remBuf(none B:Buffer, ran) = B:Buffer [owise] .
 ---eq remBuf(none B:Buffer, ran ,n:Nat) = B:Buffer [owise] .
 
+
+--- amountOfActorsRemoved e' o parametro utilizado caso queira remover mais actors com o status wait, apos remover um com o status wait na equacao (remBuf)
 op amountOfActorsRemoved : -> Nat .
 eq amountOfActorsRemoved = 0 .
 op remTwoNeighbor : Buffer Nat -> Buffer .
