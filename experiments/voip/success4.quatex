@@ -1,3 +1,0 @@
-query( ) = { s.rval(5) } ;
-eval E[ # query( ) ] ;
-

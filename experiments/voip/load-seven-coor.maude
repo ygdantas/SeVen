@@ -1,0 +1,7 @@
+load seven_coor_model_voip .
+---load tournament .
+load roulette .
+---load uniform .
+---load scenario .
+---	load exponential
+--- load lognormal

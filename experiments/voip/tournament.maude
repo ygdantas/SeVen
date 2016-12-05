@@ -1,0 +1,25 @@
+mod TOURNAMENT is
+ ---inc VOIP-RULES .
+ inc SEVEN-COOR-ATTACK .
+ inc SAMPLER .
+ inc AUXILIAR .
+
+ op ads : -> Address .
+
+ var gt : Float .
+ var NBuf : NBuffer .
+ vars lenTour lenBuf : Nat .
+ var Buf : Buffer .
+ var ads2 : Address . 
+ 
+ op tournament : Float NBuffer Nat -> ActorBuffer .
+ eq select(gt, NBuf) = tournament (gt, [getLenBuf(NBuf) | getBuffer(NBuf) ] , lenTourSeVen) .
+ 
+ eq tournament(gt, NBuf, lenTour) = 
+    < getAddress(selectGreatest(alBuf(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
+ 	< ads gt gt 0 0 >, 0))
+ 	$
+    remove(getBuffer(NBuf), getAddress(selectGreatest(alBuf(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
+ 	< ads gt gt 0 0 >, 0))) > .
+
+endm

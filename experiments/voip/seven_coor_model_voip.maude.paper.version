@@ -319,7 +319,7 @@ var remBuf : Buffer .
 ceq creatingTour([sizeBuf | B1:Buffer ; eleBuf ; B2:Buffer], sizeTour, newBuf:Buffer, cnt) 
  = creatingTour([sizeBuf + (-1) | remove(B1:Buffer ; eleBuf ; B2:Buffer, getAddress(selectRandom(B1:Buffer ; eleBuf ; B2:Buffer, sampleUniWithInt(sizeBuf), eleBuf)))], 
                   sizeTour, 
-                    newBuf:Buffer ; selectRandom(B1:Buffer ; eleBuf ; B2:Buffer, sampleUniWithInt(sizeBuf), eleBuf), 
+                    newBuf:Buffer ; selectRandom(eleBuf ; B1:Buffer ; eleBuf ; B2:Buffer, sampleUniWithInt(sizeBuf), eleBuf), 
                       cnt + 1) 
     if cnt < sizeTour .
 ---/\ eleBufDrp := selectRandom(eleBuf ; B:Buffer, sampleUniWithInt(sizeBuf), eleBuf)
@@ -383,15 +383,15 @@ eq exBuf(gt:Float, f) = floor (rat (float(pWAIT) + exp( ((alpha * (gt:Float + (-
   --- 1st parameter: Buffer - current buffer
   --- 2nd parameter: Nat - just a counter. 0 is the correct parameter
   --- 3nd parameter: Float - current time
-op DropFactor : Buffer Nat Float -> Buffer . --- alterar buffer
-ceq DropFactor(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + (pWAIT + (- 1)) ) > ; DropFactor(B:Buffer, (n:Nat + pWAIT), gt:Float) --- tentando
+op alBuf : Buffer Nat Float -> Buffer . --- alterar buffer
+ceq alBuf(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + (pWAIT + (- 1)) ) > ; alBuf(B:Buffer, (n:Nat + pWAIT), gt:Float) --- tentando
   if li == f . --- pWait case
-ceq DropFactor(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + (pIN + (- 1)) ) > ; DropFactor(B:Buffer, (n:Nat + pIN), gt:Float) --- session conectado <= tMedio 
+ceq alBuf(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat (n:Nat + (pIN + (- 1)) ) > ; alBuf(B:Buffer, (n:Nat + pIN), gt:Float) --- session conectado <= tMedio 
   if (li =/= f) and gt + (- f) <= tMedio . --- pIN case when time <= tMedio
----ceq DropFactor(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat (n:Nat + 6) > DropFactor(B:Buffer, (n:Nat + 7)) --- session conectado > tMedio
-ceq DropFactor(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat  (n:Nat + exBuf(gt:Float,f) ) > ; DropFactor(B:Buffer,  (n:Nat + exBuf(gt:Float,f) + 1 ), gt:Float )
+---ceq alBuf(< ads f li limI limS > B:Buffer, n:Nat) = < ads f li n:Nat (n:Nat + 6) > alBuf(B:Buffer, (n:Nat + 7)) --- session conectado > tMedio
+ceq alBuf(< ads f li limI limS > ; B:Buffer, n:Nat, gt:Float) = < ads f li n:Nat  (n:Nat + exBuf(gt:Float,f) ) > ; alBuf(B:Buffer,  (n:Nat + exBuf(gt:Float,f) + 1 ), gt:Float )
   if (li =/= f) and gt + (- f) > tMedio . --- pIN case when time > tMedio
-eq DropFactor(none ; B:Buffer, n:Nat, gt:Float) = B:Buffer [owise] .
+eq alBuf(none ; B:Buffer, n:Nat, gt:Float) = B:Buffer [owise] .
 
 op posRand : -> Float .
 ceq posRand = - rand
@@ -473,10 +473,10 @@ ceq uniform(gt, NBuf) = < addDr $ BufDrp >
   ops numberClient numberAttacker : -> Nat .
 
   op factor : -> Nat .
-  eq factor = 2 .
+  eq factor = 1 .
   op K : -> Float .
   --- eq K = 325.0 . --- * 4.0 .
-  eq K = float(factor) * 190.0 . --- * 325.0 .
+  eq K = float(factor) * 325.0 . --- * 325.0 .
   eq numberClient = factor * 120 .  --- number of clients
   --- eq numberClient = 120 .  --- number of clients
   eq numberAttacker = factor * 120 . --- number of attackers

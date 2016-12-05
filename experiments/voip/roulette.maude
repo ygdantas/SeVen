@@ -1,0 +1,62 @@
+mod ROULETTE is
+ ---inc VOIP-RULES .
+ inc SEVEN-COOR-ATTACK .
+ inc SAMPLER .
+ inc AUXILIAR .
+
+ op ads : -> Address .
+
+ vars gt firstT lastT : Float .
+ var NBuf : NBuffer .
+ vars lenTour lenBuf limI limS greatest randN a b x : Nat .
+ vars b1 b2 Buf : Buffer .
+ var selecAds ads2 : Address . 
+ var elBuf : EleBuf .
+
+--- check the following equations
+op retMax : Buffer Nat -> Nat .
+
+ceq retMax(b1 ; < ads2 firstT lastT limI limS > ; b2, greatest) = retMax(b1 ; b2, limS) 
+  if limS > greatest .
+ceq retMax(b1 ; < ads2 firstT lastT limI limS > ; b2, greatest) = retMax(b1 ; b2, greatest) 
+  if limS <= greatest .
+eq retMax(none, greatest) = (greatest) .
+
+--- Returns the selected actor to be removed
+  --- 1st parameter: Buffer - The current buffer
+  --- 2nd parameter: The random number * size of the buffer
+op selectEleBuf : Buffer Nat -> Address . --- alterar buffer
+ceq selectEleBuf(b1 ; < selecAds firstT lastT limI limS > ; b2, randN) = < selecAds firstT lastT limI limS >
+	if (checkInterval(limI, limS, randN)) .
+eq selectEleBuf(b1 ; < selecAds firstT lastT limI limS > ; b2 , randN) = < selecAds firstT lastT limI limS > ; selectEleBuf(b1 ; b2, randN) [owise] .
+eq selectEleBuf (none, randN) = < ads 0.0 0.0 0 0 > .
+
+--- checks intervals of the type (a <= x <= b)
+op checkInterval : Nat Nat Nat -> Bool .
+ceq checkInterval(a, b, x) = true
+	if (x >= a) and (x <= b) .
+eq checkInterval(a, b, x) = false [owise] .	
+
+--- Removes the selected actor
+  --- 1st parameter: Buffer - The current buffer
+  --- 2nd parameter: The random number * size of the buffer
+op remEleBuf : Buffer Nat -> Buffer . --- alterar buffer
+ceq remEleBuf(b1 ; < selecAds firstT lastT limI limS > ; b2, randN) = (b1 ; b2)
+	if (checkInterval(limI, limS, randN)) .
+eq remEleBuf(b1 ; < selecAds firstT lastT limI limS > ; b2 , randN) = < selecAds firstT lastT limI limS > ; remEleBuf(b1 ; b2, randN) [owise] .
+eq remEleBuf (b1 ; none ; b2, randN) = (b1 ; b2) .
+
+
+ op roulette : Float NBuffer -> ActorBuffer .
+ eq select(gt, NBuf) = roulette (gt, [getLenBuf(NBuf) | getBuffer(NBuf) ]) .
+ eq roulette(gt, NBuf) = 
+    < getAddress(selectEleBuf(DropFactor(getBuffer(NBuf),0,gt), sampleUniWithInt( retMax(DropFactor(getBuffer(NBuf),0,gt),0) ) ))
+ 	$
+ 	remove(getBuffer(NBuf), getAddress(selectEleBuf(DropFactor(getBuffer(NBuf),0,gt), sampleUniWithInt( retMax(DropFactor(getBuffer(NBuf),0,gt),0) ) ))) > .
+
+
+---    remEleBuf(alBuf(getBuffer(NBuf),0,gt), sampleUniWithInt( retMax(alBuf(getBuffer(NBuf),0,gt),0) ) ) > .
+
+ 	
+
+endm
