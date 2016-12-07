@@ -432,31 +432,6 @@ op select : Float NBuffer -> ActorBuffer .
   op arate : Float -> Config .    ---- current attack rate
   op crate : Float -> Config .    ---- current client request rate
 
---------------- Uniform ---------------
-***(
- ---var BufDrp : Buffer .
- ---var addDr : Address . 
-   var eleDr : EleBuf .
- var NBuf : NBuffer .
-
- op addDr : -> Address .
- op BufDrp : -> Buffer . 
-
- op adsTMP : -> Address .
-
---- op remove : Buffer Address -> Buffer .
-op uniform : Float NBuffer -> ActorBuffer .
-ceq uniform(gt, NBuf) = < addDr $ BufDrp > 
- if addDr := getAddress(selectRandom(getBuffer(NBuf), sampleUniWithInt(getLenBuf(NBuf)), < adsTMP gt gt 0 0 > )) 
- /\ BufDrp := remove(getBuffer(NBuf), addDr) . 
-)
-***( 
- if eleDr := selectRandom(getBuffer(NBuf), sampleUniWithInt(getLenBuf(NBuf)), < adsTMP gt gt 0 0 > )
- /\ addDr := getAddress(eleDr)
- /\ BufDrp := remove(getBuffer(NBuf),addDr, < adsTMP gt gt 0 0 >) .
-)
---------------- Uniform ---------------
-
 
   ops lenPRAGMA lenGET : -> Nat .
   op ran : Nat -> Bool .
@@ -528,10 +503,7 @@ eq initState = flag(true, 1.0) arate(newAlpha) crate(newRho)  ---{ 0.0 | nil }
 	<name: g | server: server, cnt: 0 , none > ---(g <- spawn)
 	<name: ga | server: server, cnt: 0 , none >
       mytick(insert( insert( insert ({ 0.0 | nil} , [ initDelay, (ga <- spawn ), 0 ] ), [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) )  .
----mytick(insert( insert ({ 0.0 | nil } , [ initDelay , (g <- spawn ), 0 ] ), [ Ts, (server <- TIMEOUT), 0] ) ) .
-	--- mytick( insert( { 0.0 | nil }, [ initDelay, (g <- spawn), 0] ) ) .
----mytick(insert( { 0.0 | nil } , 
-	---	  [ initDelay , (g <- spawn ), 0 ] ) ) .	
+	
 
 --- rewriting rules start here
   crl[stop] :
@@ -539,8 +511,6 @@ eq initState = flag(true, 1.0) arate(newAlpha) crate(newRho)  ---{ 0.0 | nil }
    =>
      flag(false,r) mytick({gt | SL})
       if gt >= LIMIT .
-
---- SeVen / App ---
 
 op emptyServer : -> Actor .
 op checkEmpty : Config -> Bool .
@@ -553,8 +523,7 @@ vars SchAcc SchAcc2 SchRej : Scheduler .
 var ActorDr : Address .
 var bufDr : Buffer .
 vars nBufP nBufR p-setNu r-setNu : NBuffer .  
---- models SeVen acting: when the buffer is full, SeVen creates a tournament(n) and selects (or not) the longest EleBuf in the buffer to be dropped. 
---- when the buffer is not full, seven adds the incoming request
+
 
 ***(
 crl [ServerINVITE] : 
@@ -660,23 +629,6 @@ crl [ServerINVITE] :
 
 
 --- CLIENT ---
-
-***(
---- Experimento 0
---- (1.0  / (Rho * S)) = K grande o suficiente, mas nao tao grande
---- 80% buffer ocupado somente com clientes
-
---- (1.0  / (Alpha * SA)) + (1.0  / (Rho * S)) = K
---- Experimento 1: 1 - 1
---- (1.0  / (Alpha * SA)) = (1.0  / (Rho * S)) = K/2
---- Experimento 2: 1 - 2
---- (1.0  / (Alpha * SA)) = 2 x (1.0  / (Rho * S)) 
----       2 * K / 3                 K / 3 
---- Experimento 3: 1 - 3
---- (1.0  / (Alpha * SA)) = 2 x (1.0  / (Rho * S)) 
----       3 * K / 4                 K / 4
---- ... 
-)
 
 --- Clients coming in at the rate of Rho * S
     eq crate(Rho)
