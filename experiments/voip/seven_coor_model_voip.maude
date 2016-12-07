@@ -473,10 +473,10 @@ ceq uniform(gt, NBuf) = < addDr $ BufDrp >
   ops numberClient numberAttacker : -> Nat .
 
   op factor : -> Nat .
-  eq factor = 2 .
+  eq factor = 1 .
   op K : -> Float .
   --- eq K = 325.0 . --- * 4.0 .
-  eq K = float(factor) * 190.0 . --- * 325.0 .
+  eq K = float(factor) * 325.0 . --- * 325.0 .
   eq numberClient = factor * 120 .  --- number of clients
   --- eq numberClient = 120 .  --- number of clients
   eq numberAttacker = factor * 120 . --- number of attackers

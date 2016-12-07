@@ -16,10 +16,10 @@ mod TOURNAMENT is
  eq select(gt, NBuf) = tournament (gt, [getLenBuf(NBuf) | getBuffer(NBuf) ] , lenTourSeVen) .
  
  eq tournament(gt, NBuf, lenTour) = 
-    < getAddress(selectGreatest(alBuf(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
+    < getAddress(selectGreatest(DropFactor(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
  	< ads gt gt 0 0 >, 0))
  	$
-    remove(getBuffer(NBuf), getAddress(selectGreatest(alBuf(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
+    remove(getBuffer(NBuf), getAddress(selectGreatest(DropFactor(creatingTour([getLenBuf(NBuf) |  getBuffer(NBuf)], lenTourSeVen, none, 0), 0, gt), 
  	< ads gt gt 0 0 >, 0))) > .
 
 endm
